@@ -5,8 +5,8 @@ import { API } from '../api'
 
 function getRiskColor(level) {
   if (level === 'HIGH') return 'var(--risk-high)'
-  if (level === 'MEDIUM') return 'var(--risk-medium)'
-  if (level === 'LOW') return 'var(--risk-low)'
+  if (level === 'MEDIUM') return 'var(--gold)'
+  if (level === 'LOW') return 'var(--accent-light)'
   return 'var(--text-muted)'
 }
 
@@ -52,7 +52,8 @@ export default function Dashboard() {
   if (loading) return (
     <div>
       <div className="page-header">
-        <div className="page-title">🏫 Class Overview</div>
+        <div className="page-title">🇵🇰 Class Overview | Jashn-e-Azadi Special</div>
+        <div className="page-title-urdu">نگرانی طالبات — گورنمنٹ گرلز اسکول بہاولپور</div>
         <div className="page-subtitle">Loading student data...</div>
       </div>
       <div className="loading-spinner" />
@@ -65,7 +66,11 @@ export default function Dashboard() {
   return (
     <div>
       <div className="page-header">
-        <div className="page-title">🏫 Class Overview</div>
+        <div className="page-title-row">
+          <h1 className="page-title">🇵🇰 Class Overview | Jashn-e-Azadi Special</h1>
+          <span className="azadi-tag">AZADI 2026</span>
+        </div>
+        <div className="page-title-urdu">نگرانی طالبات — گورنمنٹ گرلز اسکول بہاولپور</div>
         <div className="page-subtitle">
           Monitoring {data?.total_students || 0} students — updated just now
         </div>
@@ -90,12 +95,12 @@ export default function Dashboard() {
           <div className="stat-sub">Need immediate action</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">🟡 Medium Risk</div>
+          <div className="stat-label">🌙 Medium Risk</div>
           <div className="stat-value medium">{data.medium_risk}</div>
           <div className="stat-sub">Require close watch</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">🟢 Low Risk</div>
+          <div className="stat-label">⭐ Low Risk</div>
           <div className="stat-value low">{data.low_risk}</div>
           <div className="stat-sub">On track</div>
         </div>
@@ -113,14 +118,14 @@ export default function Dashboard() {
       )}
 
       {/* Filter Tabs */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
         {['ALL', 'HIGH', 'MEDIUM', 'LOW'].map((f) => (
           <button
             key={f}
-            className={`btn btn-sm ${filter === f ? 'btn-primary' : 'btn-ghost'}`}
+            className={`btn btn-sm ${filter === f ? (f === 'MEDIUM' ? 'btn-gold' : 'btn-primary') : 'btn-ghost'}`}
             onClick={() => setFilter(f)}
           >
-            {f === 'HIGH' ? '🔴' : f === 'MEDIUM' ? '🟡' : f === 'LOW' ? '🟢' : ''}  {f}
+            {f === 'HIGH' ? '🔴' : f === 'MEDIUM' ? '🌙' : f === 'LOW' ? '⭐' : ''} {f}
             {f !== 'ALL' && (
               <span style={{
                 background: 'rgba(255,255,255,0.15)',
@@ -136,77 +141,91 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Student Cards */}
-      <div className="students-grid">
-        {filtered.map((student) => (
-          <div
-            key={student.student_id}
-            className={`student-card ${student.risk_level} ${student.risk_level === 'HIGH' ? 'pulse-high' : ''}`}
-            onClick={() => navigate(`/student/${student.student_id}`)}
-          >
-            <div className="student-card-top">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div className={`student-avatar ${getAvatarClass(student.risk_level)}`}>
-                  {getInitials(student.name)}
+      {/* Student Cards or Empty State */}
+      {filtered.length === 0 ? (
+        <div className="empty-state card">
+          <div className="empty-icon">🇵🇰</div>
+          <div className="empty-title">کوئی طالبہ نہیں ملی / No Students Found</div>
+          <div style={{ color: 'var(--text-secondary)', fontSize: 14, marginTop: 8 }}>
+            There are no students matching the filter "{filter}".
+          </div>
+          <button className="btn btn-ghost btn-sm" style={{ marginTop: 16 }} onClick={() => setFilter('ALL')}>
+            Show All Students
+          </button>
+        </div>
+      ) : (
+        <div className="students-grid">
+          {filtered.map((student) => (
+            <div
+              key={student.student_id}
+              className={`student-card ${student.risk_level} ${student.risk_level === 'HIGH' ? 'pulse-high' : ''}`}
+              onClick={() => navigate(`/student/${student.student_id}`)}
+            >
+              <div className="student-card-top">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div className={`student-avatar ${getAvatarClass(student.risk_level)}`}>
+                    {getInitials(student.name)}
+                  </div>
+                  <div>
+                    <div className="student-name">{student.name}</div>
+                    <div className="student-grade">Grade {student.grade} &nbsp;·&nbsp; Roll #{student.student_id}</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="student-name">{student.name}</div>
-                  <div className="student-grade">Grade {student.grade} &nbsp;·&nbsp; Roll #{student.student_id}</div>
-                </div>
-              </div>
-              <span className={`risk-badge ${student.risk_level}`}>
-                {student.risk_level === 'HIGH' ? '🔴' : student.risk_level === 'MEDIUM' ? '🟡' : '🟢'} {student.risk_level}
-              </span>
-            </div>
-
-            {/* Metrics */}
-            <div className="student-metrics">
-              <div className="metric-item">
-                <div className="metric-value" style={{ color: student.attendance_rate < 65 ? 'var(--risk-high)' : student.attendance_rate < 80 ? 'var(--risk-medium)' : 'var(--risk-low)' }}>
-                  {student.attendance_rate}%
-                </div>
-                <div className="metric-label">Attendance</div>
-              </div>
-              <div className="metric-item">
-                <div className="metric-value" style={{ color: student.avg_score < 40 ? 'var(--risk-high)' : student.avg_score < 60 ? 'var(--risk-medium)' : 'var(--risk-low)' }}>
-                  {student.avg_score}%
-                </div>
-                <div className="metric-label">Avg Score</div>
-              </div>
-              <div className="metric-item">
-                <div className="metric-value">
-                  <FeeTag status={student.fee_status} />
-                </div>
-                <div className="metric-label">Fees</div>
-              </div>
-            </div>
-
-            {/* Risk Score Bar */}
-            <div className="risk-score-bar">
-              <div className="risk-bar-label">
-                <span>Risk Score</span>
-                <span style={{ color: getRiskColor(student.risk_level), fontWeight: 700 }}>
-                  {student.risk_score}/100
+                <span className={`risk-badge ${student.risk_level}`}>
+                  {student.risk_level === 'HIGH' ? '🔴' : student.risk_level === 'MEDIUM' ? '🌙' : '⭐'} {student.risk_level}
                 </span>
               </div>
-              <div className="risk-bar-track">
-                <div
-                  className="risk-bar-fill"
-                  style={{
-                    width: `${student.risk_score}%`,
-                    background: getRiskColor(student.risk_level),
-                  }}
-                />
+
+              {/* Metrics */}
+              <div className="student-metrics">
+                <div className="metric-item">
+                  <div className="metric-value" style={{ color: student.attendance_rate < 65 ? 'var(--risk-high)' : student.attendance_rate < 80 ? 'var(--gold)' : 'var(--accent-light)' }}>
+                    {student.attendance_rate}%
+                  </div>
+                  <div className="metric-label">Attendance</div>
+                </div>
+                <div className="metric-item">
+                  <div className="metric-value" style={{ color: student.avg_score < 40 ? 'var(--risk-high)' : student.avg_score < 60 ? 'var(--gold)' : 'var(--accent-light)' }}>
+                    {student.avg_score}%
+                  </div>
+                  <div className="metric-label">Avg Score</div>
+                </div>
+                <div className="metric-item">
+                  <div className="metric-value">
+                    <FeeTag status={student.fee_status} />
+                  </div>
+                  <div className="metric-label">Fees</div>
+                </div>
+              </div>
+
+              {/* Risk Score Bar */}
+              <div className="risk-score-bar">
+                <div className="risk-bar-label">
+                  <span>Risk Score</span>
+                  <span style={{ color: getRiskColor(student.risk_level), fontWeight: 700 }}>
+                    {student.risk_score}/100
+                  </span>
+                </div>
+                <div className="risk-bar-track">
+                  <div
+                    className="risk-bar-fill"
+                    style={{
+                      width: `${student.risk_score}%`,
+                      background: getRiskColor(student.risk_level),
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginTop: 14, fontSize: 12, color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between' }}>
+                <span>Click to view details & AI analysis</span>
+                <span>→</span>
               </div>
             </div>
-
-            <div style={{ marginTop: 14, fontSize: 12, color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between' }}>
-              <span>Click to view details & AI analysis</span>
-              <span>→</span>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
+

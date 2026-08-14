@@ -9,43 +9,54 @@ function InterventionCard({ item, onAction, onViewStudent }) {
 
   const riskColors = {
     HIGH: { bg: 'var(--risk-high-bg)', border: 'var(--risk-high-border)', color: 'var(--risk-high)' },
-    MEDIUM: { bg: 'var(--risk-medium-bg)', border: 'var(--risk-medium-border)', color: 'var(--risk-medium)' },
-    LOW: { bg: 'var(--risk-low-bg)', border: 'var(--risk-low-border)', color: 'var(--risk-low)' },
+    MEDIUM: { bg: 'var(--risk-medium-bg)', border: 'var(--risk-medium-border)', color: 'var(--gold)' },
+    LOW: { bg: 'var(--risk-low-bg)', border: 'var(--risk-low-border)', color: 'var(--accent-light)' },
   }
 
   const colors = riskColors[item.risk_level] || riskColors.LOW
 
   return (
     <div style={{
-      background: 'var(--bg-card)',
-      border: `1px solid ${item.actioned ? 'var(--border)' : colors.border}`,
+      background: 'linear-gradient(135deg, rgba(16, 45, 32, 0.85), rgba(10, 32, 22, 0.95))',
+      backdropFilter: 'blur(10px)',
+      border: `1px solid ${item.actioned ? 'var(--border)' : (item.risk_level === 'HIGH' ? 'var(--risk-high-border)' : 'var(--gold)')}`,
+      boxShadow: 'var(--shadow)',
       borderRadius: 'var(--radius-lg)',
-      padding: 20,
-      opacity: item.actioned ? 0.7 : 1,
-      transition: 'all 0.2s',
+      padding: 22,
+      opacity: item.actioned ? 0.75 : 1,
+      transition: 'all 0.25s ease',
     }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 260 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
             <span className={`risk-badge ${item.risk_level}`}>
-              {item.risk_level === 'HIGH' ? '🔴' : item.risk_level === 'MEDIUM' ? '🟡' : '🟢'} {item.risk_level}
+              {item.risk_level === 'HIGH' ? '🔴' : item.risk_level === 'MEDIUM' ? '🌙' : '⭐'} {item.risk_level}
             </span>
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>
+            <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary)' }}>
               {item.student_name}
             </span>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Grade {item.student_grade}</span>
-            {item.actioned && (
-              <span className="tag" style={{ background: 'var(--risk-low-bg)', color: 'var(--risk-low)', border: '1px solid var(--risk-low-border)' }}>
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Grade {item.student_grade}</span>
+            
+            {item.actioned ? (
+              <span style={{ background: 'var(--risk-low-bg)', color: 'var(--accent-light)', border: '1px solid var(--risk-low-border)', padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 800 }}>
                 ✅ Actioned
+              </span>
+            ) : (
+              <span style={{ background: 'var(--risk-medium-bg)', color: 'var(--gold)', border: '1px solid var(--risk-medium-border)', padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 800 }}>
+                ⏳ Action Pending
               </span>
             )}
           </div>
-          <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+
+          <div style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
             {item.risk_explanation}
           </div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>
-            Generated: {new Date(item.created_at).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-            &nbsp;·&nbsp; Risk Score: <strong style={{ color: colors.color }}>{item.risk_score}/100</strong>
+
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 10, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <span>Generated: {new Date(item.created_at).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+            <span>·</span>
+            <span>Risk Score: <strong style={{ color: colors.color, fontSize: 13 }}>{item.risk_score}/100</strong></span>
+            <span className="azadi-tag" style={{ fontSize: '10px' }}>🇵🇰 AZADI PLAN</span>
           </div>
         </div>
 
@@ -54,18 +65,18 @@ function InterventionCard({ item, onAction, onViewStudent }) {
             👁️ View Student
           </button>
           {!item.actioned && item.risk_level !== 'LOW' && (
-            <button className="btn btn-success btn-sm" onClick={() => onAction(item.id)}>
+            <button className="btn btn-gold btn-sm" onClick={() => onAction(item.id)}>
               ✅ Mark Actioned
             </button>
           )}
           <button className="btn btn-ghost btn-sm" onClick={() => setExpanded(!expanded)}>
-            {expanded ? '▲ Hide' : '▼ View Plan'}
+            {expanded ? '▲ Hide Plan' : '▼ View AI Plan'}
           </button>
         </div>
       </div>
 
       {expanded && item.risk_level !== 'LOW' && (
-        <div style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ marginTop: 18, borderTop: '1px solid var(--border)', paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
           {item.parent_sms && (
             <div className="intervention-tab">
               <div className="intervention-tab-title">📱 Parent SMS</div>
@@ -140,9 +151,12 @@ export default function Interventions() {
   return (
     <div>
       <div className="page-header">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
           <div>
-            <div className="page-title">⚠️ Interventions</div>
+            <div className="page-title-row">
+              <h1 className="page-title">⚠️ Interventions | Azadi Action Portal</h1>
+              <span className="azadi-tag">JASHN-E-AZADI</span>
+            </div>
             <div className="page-subtitle">AI-generated action plans for at-risk students</div>
           </div>
           {pending > 0 && (
@@ -159,12 +173,12 @@ export default function Interventions() {
           { id: 'ALL', label: 'All' },
           { id: 'PENDING', label: `🔔 Pending (${pending})` },
           { id: 'HIGH', label: `🔴 High Risk (${high})` },
-          { id: 'MEDIUM', label: '🟡 Medium Risk' },
+          { id: 'MEDIUM', label: '🌙 Medium Risk' },
           { id: 'ACTIONED', label: '✅ Actioned' },
         ].map((f) => (
           <button
             key={f.id}
-            className={`btn btn-sm ${filter === f.id ? 'btn-primary' : 'btn-ghost'}`}
+            className={`btn btn-sm ${filter === f.id ? (f.id === 'PENDING' ? 'btn-gold' : 'btn-primary') : 'btn-ghost'}`}
             onClick={() => setFilter(f.id)}
           >
             {f.label}
@@ -175,7 +189,7 @@ export default function Interventions() {
       {loading ? (
         <div className="loading-spinner" />
       ) : filtered.length === 0 ? (
-        <div className="empty-state">
+        <div className="empty-state card">
           <div className="empty-icon">🎉</div>
           <div className="empty-title">No interventions to show</div>
           <div>All students are on track or interventions have been actioned.</div>
@@ -195,3 +209,4 @@ export default function Interventions() {
     </div>
   )
 }
+

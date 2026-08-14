@@ -3,6 +3,11 @@ import axios from 'axios'
 import { useToast } from '../App'
 import { API } from '../api'
 
+const toLocalISO = (dateStr) => {
+  if (!dateStr) return new Date().toISOString()
+  return dateStr.includes('T') ? dateStr : `${dateStr}T12:00:00.000Z`
+}
+
 export default function LogEntry() {
   const [students, setStudents] = useState([])
   const [selectedId, setSelectedId] = useState('')
@@ -24,7 +29,7 @@ export default function LogEntry() {
 
   // Fee form
   const [feeMonth, setFeeMonth] = useState('August')
-  const [feeYear, setFeeYear] = useState('2025')
+  const [feeYear, setFeeYear] = useState('2026')
   const [feeStatus, setFeeStatus] = useState('paid')
 
   // New student form
@@ -43,7 +48,7 @@ export default function LogEntry() {
     setSubmitting(true)
     try {
       await axios.post(`${API}/students/${selectedId}/attendance`, {
-        date: new Date(attDate).toISOString(),
+        date: toLocalISO(attDate),
         present: attPresent,
         notes: attNotes || null,
       })
@@ -58,7 +63,7 @@ export default function LogEntry() {
     setSubmitting(true)
     try {
       await axios.post(`${API}/students/${selectedId}/scores`, {
-        date: new Date(scoreDate).toISOString(),
+        date: toLocalISO(scoreDate),
         subject: scoreSubject,
         score: parseFloat(scoreValue),
         max_score: parseFloat(scoreMax),
@@ -118,11 +123,14 @@ export default function LogEntry() {
   return (
     <div>
       <div className="page-header">
-        <div className="page-title">✏️ Log Entry</div>
+        <div className="page-title-row">
+          <h1 className="page-title">✏️ Log Entry</h1>
+          <span className="azadi-tag">AZADI EDITION</span>
+        </div>
         <div className="page-subtitle">Record attendance, test scores, and fee status for students</div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 20, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 20, alignItems: 'start' }}>
         {/* Tab sidebar */}
         <div className="card" style={{ padding: 12 }}>
           {tabs.map((t) => (
@@ -130,7 +138,7 @@ export default function LogEntry() {
               key={t.id}
               className={`nav-item ${tab === t.id ? 'active' : ''}`}
               onClick={() => setTab(t.id)}
-              style={{ marginBottom: 4 }}
+              style={{ marginBottom: 6 }}
             >
               <span>{t.icon}</span> {t.label.split(' ').slice(1).join(' ')}
             </div>
@@ -224,7 +232,7 @@ export default function LogEntry() {
               </div>
               {scoreValue && scoreMax && (
                 <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: 12, marginBottom: 16, fontSize: 14, color: 'var(--text-secondary)' }}>
-                  Percentage: <strong style={{ color: parseFloat(scoreValue)/parseFloat(scoreMax)*100 < 40 ? 'var(--risk-high)' : 'var(--risk-low)' }}>
+                  Percentage: <strong style={{ color: parseFloat(scoreValue)/parseFloat(scoreMax)*100 < 40 ? 'var(--risk-high)' : 'var(--accent-light)' }}>
                     {(parseFloat(scoreValue)/parseFloat(scoreMax)*100).toFixed(1)}%
                   </strong>
                 </div>
@@ -252,7 +260,7 @@ export default function LogEntry() {
                 <div className="form-group">
                   <label className="form-label">Year</label>
                   <select className="form-select" value={feeYear} onChange={(e) => setFeeYear(e.target.value)}>
-                    {['2024', '2025', '2026'].map((y) => <option key={y}>{y}</option>)}
+                    {['2024', '2025', '2026', '2027'].map((y) => <option key={y}>{y}</option>)}
                   </select>
                 </div>
               </div>
@@ -262,9 +270,9 @@ export default function LogEntry() {
                   {['paid', 'pending', 'overdue'].map((s) => (
                     <button
                       key={s}
-                      className={`toggle-btn ${feeStatus === s ? (s === 'paid' ? 'active-present' : 'active-absent') : ''}`}
+                      className={`toggle-btn ${feeStatus === s ? (s === 'paid' ? 'active-present' : s === 'overdue' ? 'active-absent' : '') : ''}`}
+                      style={feeStatus === s && s === 'pending' ? { background: 'var(--risk-medium-bg)', color: 'var(--gold)', fontWeight: 800 } : {}}
                       onClick={() => setFeeStatus(s)}
-                      style={{ textTransform: 'capitalize' }}
                     >
                       {s === 'paid' ? '✅' : s === 'pending' ? '⏳' : '🔴'} {s}
                     </button>
@@ -316,3 +324,4 @@ export default function LogEntry() {
     </div>
   )
 }
+

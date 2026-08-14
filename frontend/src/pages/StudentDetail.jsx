@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import {
@@ -18,21 +18,21 @@ const chartDefaults = {
   plugins: {
     legend: { display: false },
     tooltip: {
-      backgroundColor: '#151b2d',
-      borderColor: 'rgba(255,255,255,0.07)',
+      backgroundColor: '#0a2016',
+      borderColor: 'rgba(255,255,255,0.12)',
       borderWidth: 1,
-      titleColor: '#e8eaf0',
-      bodyColor: '#8892a4',
+      titleColor: '#ffffff',
+      bodyColor: '#cbd5e1',
     },
   },
   scales: {
     x: {
-      grid: { color: 'rgba(255,255,255,0.04)' },
-      ticks: { color: '#4a5568', font: { size: 10 } },
+      grid: { color: 'rgba(255,255,255,0.06)' },
+      ticks: { color: '#94a3b8', font: { size: 10 } },
     },
     y: {
-      grid: { color: 'rgba(255,255,255,0.04)' },
-      ticks: { color: '#4a5568', font: { size: 10 } },
+      grid: { color: 'rgba(255,255,255,0.06)' },
+      ticks: { color: '#94a3b8', font: { size: 10 } },
     },
   },
 }
@@ -51,11 +51,11 @@ function AttendanceChart({ data }) {
     labels: byWeek.map((w) => w.label),
     datasets: [{
       data: byWeek.map((w) => w.rate),
-      borderColor: '#6c63ff',
-      backgroundColor: 'rgba(108,99,255,0.1)',
+      borderColor: '#00A859',
+      backgroundColor: 'rgba(0, 168, 89, 0.15)',
       fill: true,
       tension: 0.4,
-      pointBackgroundColor: byWeek.map((w) => w.rate < 60 ? '#ff4757' : w.rate < 80 ? '#ffa502' : '#2ed573'),
+      pointBackgroundColor: byWeek.map((w) => w.rate < 60 ? '#EF4444' : w.rate < 80 ? '#F59E0B' : '#00A859'),
       pointRadius: 5,
     }],
   }
@@ -76,7 +76,7 @@ function ScoreChart({ data }) {
     labels: sorted.map((s) => s.subject.slice(0, 4)),
     datasets: [{
       data: sorted.map((s) => s.percentage),
-      backgroundColor: sorted.map((s) => s.percentage < 40 ? 'rgba(255,71,87,0.7)' : s.percentage < 60 ? 'rgba(255,165,2,0.7)' : 'rgba(46,213,115,0.7)'),
+      backgroundColor: sorted.map((s) => s.percentage < 40 ? 'rgba(239, 68, 68, 0.8)' : s.percentage < 60 ? 'rgba(245, 158, 11, 0.8)' : 'rgba(0, 168, 89, 0.8)'),
       borderRadius: 6,
     }],
   }
@@ -92,12 +92,12 @@ function ScoreChart({ data }) {
 
 function FeeChart({ data }) {
   const statusMap = { paid: 3, pending: 2, overdue: 1 }
-  const colorMap = { paid: '#2ed573', pending: '#ffa502', overdue: '#ff4757' }
+  const colorMap = { paid: '#00A859', pending: '#F59E0B', overdue: '#EF4444' }
   const chartData = {
     labels: data.map((f) => `${f.month.slice(0, 3)} ${f.year}`),
     datasets: [{
       data: data.map((f) => statusMap[f.status] || 0),
-      backgroundColor: data.map((f) => colorMap[f.status] || '#636e72'),
+      backgroundColor: data.map((f) => colorMap[f.status] || '#94a3b8'),
       borderRadius: 6,
     }],
   }
@@ -129,7 +129,6 @@ export default function StudentDetail() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [analyzing, setAnalyzing] = useState(false)
-  const [generating, setGenerating] = useState(false)
 
   const load = () => {
     setLoading(true)
@@ -158,18 +157,18 @@ export default function StudentDetail() {
 
   if (loading) return (
     <div>
-      <button className="back-btn" onClick={() => navigate('/')}>← Back to Dashboard</button>
+      <button className="btn btn-ghost btn-sm" onClick={() => navigate('/')} style={{ marginBottom: 20 }}>← Back to Dashboard</button>
       <div className="loading-spinner" />
     </div>
   )
 
   const { student, metrics, risk, attendance, scores, fees, latest_intervention } = data
 
-  const riskColor = risk.risk_level === 'HIGH' ? 'var(--risk-high)' : risk.risk_level === 'MEDIUM' ? 'var(--risk-medium)' : 'var(--risk-low)'
+  const riskColor = risk.risk_level === 'HIGH' ? 'var(--risk-high)' : risk.risk_level === 'MEDIUM' ? 'var(--gold)' : 'var(--accent-light)'
 
   return (
     <div>
-      <button className="back-btn" onClick={() => navigate('/')}>← Back to Dashboard</button>
+      <button className="btn btn-ghost btn-sm" onClick={() => navigate('/')} style={{ marginBottom: 20 }}>← Back to Dashboard</button>
 
       {/* Student Header */}
       <div className="card" style={{ marginBottom: 24, background: 'linear-gradient(135deg, var(--bg-card), var(--bg-secondary))' }}>
@@ -194,7 +193,7 @@ export default function StudentDetail() {
           </div>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             <span className={`risk-badge ${risk.risk_level}`} style={{ fontSize: 14, padding: '8px 18px' }}>
-              {risk.risk_level === 'HIGH' ? '🔴' : risk.risk_level === 'MEDIUM' ? '🟡' : '🟢'} {risk.risk_level} RISK
+              {risk.risk_level === 'HIGH' ? '🔴' : risk.risk_level === 'MEDIUM' ? '🌙' : '⭐'} {risk.risk_level} RISK
             </span>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: 28, fontWeight: 800, color: riskColor }}>{risk.risk_score}<span style={{ fontSize: 14 }}>/100</span></div>
@@ -212,7 +211,7 @@ export default function StudentDetail() {
           ].map((m) => (
             <div key={m.label} className="metric-item" style={{ padding: 16 }}>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>{m.label}</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: m.bad ? 'var(--risk-high)' : 'var(--risk-low)' }}>{m.value}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: m.bad ? 'var(--risk-high)' : 'var(--accent-light)' }}>{m.value}</div>
             </div>
           ))}
         </div>
@@ -221,12 +220,15 @@ export default function StudentDetail() {
       {/* AI Risk Explanation */}
       {latest_intervention && (
         <div className={`alert-box ${latest_intervention.risk_level.toLowerCase()}`} style={{ marginBottom: 24 }}>
-          <div className="alert-title">🤖 Gemini AI Risk Analysis</div>
-          <div className="alert-body">{latest_intervention.risk_explanation}</div>
+          <div className="alert-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+            <span>🤖 Gemini AI Risk Analysis</span>
+            <span className="azadi-tag" style={{ fontSize: '10px' }}>🇵🇰 AZADI AI INSIGHT</span>
+          </div>
+          <div className="alert-body" style={{ marginTop: 8 }}>{latest_intervention.risk_explanation}</div>
           {latest_intervention.risk_level !== 'LOW' && !latest_intervention.actioned && (
             <button
               className="btn btn-ghost btn-sm"
-              style={{ marginTop: 10 }}
+              style={{ marginTop: 12 }}
               onClick={() => actionIntervention(latest_intervention.id)}
             >
               ✅ Mark as Actioned
@@ -236,7 +238,7 @@ export default function StudentDetail() {
       )}
 
       {/* Charts */}
-      <div className="charts-grid" style={{ marginBottom: 24 }}>
+      <div className="charts-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 18, marginBottom: 24 }}>
         {attendance.length > 0 && <AttendanceChart data={attendance} />}
         {scores.length > 0 && <ScoreChart data={scores} />}
         {fees.length > 0 && <FeeChart data={fees} />}
@@ -245,10 +247,13 @@ export default function StudentDetail() {
       {/* Intervention Actions */}
       {latest_intervention && latest_intervention.risk_level !== 'LOW' && (
         <div className="card" style={{ marginBottom: 24 }}>
-          <div className="section-title">
-            📋 AI-Generated Intervention Plan
+          <div className="section-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span>📋 AI-Generated Intervention Plan</span>
+              <span className="azadi-tag">AZADI ACTION PLAN</span>
+            </div>
             {latest_intervention.actioned && (
-              <span className="tag" style={{ marginLeft: 8, background: 'var(--risk-low-bg)', color: 'var(--risk-low)', border: '1px solid var(--risk-low-border)' }}>
+              <span className="tag" style={{ background: 'var(--risk-low-bg)', color: 'var(--accent-light)', border: '1px solid var(--risk-low-border)', padding: '4px 10px', borderRadius: 12, fontSize: 12, fontWeight: 700 }}>
                 ✅ Actioned
               </span>
             )}
@@ -274,7 +279,7 @@ export default function StudentDetail() {
       )}
 
       {/* Re-analyze button */}
-      <div style={{ display: 'flex', gap: 12 }}>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         <button className="btn btn-primary" onClick={runAnalysis} disabled={analyzing}>
           {analyzing ? '🤖 Analyzing...' : '🔄 Re-run AI Analysis'}
         </button>
@@ -285,3 +290,4 @@ export default function StudentDetail() {
     </div>
   )
 }
+
