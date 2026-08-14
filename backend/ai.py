@@ -10,54 +10,73 @@ import google.generativeai as genai
 load_dotenv()
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-GROQ_MODEL = os.getenv("GROQ_MODEL", "meta-llama/Llama-3.3-70B-Instruct")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
 
 # Initialize Gemini if configured
+gemini_model = None
 if GEMINI_API_KEY and GEMINI_API_KEY != "your_gemini_api_key_here":
-    try:
-        genai.configure(api_key=GEMINI_API_KEY)
-        gemini_model = genai.GenerativeModel("gemini-1.5-flash")
-    except Exception:
-        gemini_model = None
-else:
-    gemini_model = None
+    genai.configure(api_key=GEMINI_API_KEY)
+    gemini_targets = [
+        GEMINI_MODEL,
+        "gemini-3.5-flash-lite",
+        "gemini-2.5-flash-lite",
+        "gemini-1.5-flash-lite",
+        "gemini-1.5-flash",
+    ]
+    for gm in gemini_targets:
+        try:
+            gemini_model = genai.GenerativeModel(gm)
+            break
+        except Exception:
+            continue
 
 AI_ENABLED = bool(GROQ_API_KEY or (GEMINI_API_KEY and GEMINI_API_KEY != "your_gemini_api_key_here"))
 
 
 def call_llm(prompt: str, system_prompt: str = "") -> str:
     """
-    Calls Groq API (meta-llama/Llama-3.3-70B-Instruct) first.
-    If Groq is unconfigured or fails, falls back to Gemini API.
+    Calls Groq API (llama-3.3-70b-versatile) first.
+    If Groq fails, falls back to Gemini API (gemini-3.5-flash-lite).
     """
     groq_key = os.getenv("GROQ_API_KEY", "")
     if groq_key and groq_key != "your_groq_api_key_here":
-        try:
-            url = "https://api.groq.com/openai/v1/chat/completions"
-            headers = {
-                "Authorization": f"Bearer {groq_key}",
-                "Content-Type": "application/json"
-            }
-            messages = []
-            if system_prompt:
-                messages.append({"role": "system", "content": system_prompt})
-            messages.append({"role": "user", "content": prompt})
+        groq_models = [
+            os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
+            "llama-3.3-70b-versatile",
+            "llama-3.1-70b-versatile",
+            "meta-llama/Llama-3.3-70B-Instruct",
+            "llama3-70b-8192"
+        ]
+        
+        for g_model in groq_models:
+            try:
+                url = "https://api.groq.com/openai/v1/chat/completions"
+                headers = {
+                    "Authorization": f"Bearer {groq_key}",
+                    "Content-Type": "application/json"
+                }
+                messages = []
+                if system_prompt:
+                    messages.append({"role": "system", "content": system_prompt})
+                messages.append({"role": "user", "content": prompt})
 
-            payload = {
-                "model": os.getenv("GROQ_MODEL", "meta-llama/Llama-3.3-70B-Instruct"),
-                "messages": messages,
-                "temperature": 0.7,
-                "max_tokens": 1024
-            }
+                payload = {
+                    "model": g_model,
+                    "messages": messages,
+                    "temperature": 0.7,
+                    "max_tokens": 1024
+                }
 
-            req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers=headers)
-            with urllib.request.urlopen(req, timeout=6) as response:
-                res_data = json.loads(response.read().decode('utf-8'))
-                return res_data['choices'][0]['message']['content']
-        except Exception as e:
-            print(f"Groq API error (Llama-3.3-70B): {e}, falling back to Gemini / Local Engine...")
+                req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers=headers)
+                with urllib.request.urlopen(req, timeout=6) as response:
+                    res_data = json.loads(response.read().decode('utf-8'))
+                    return res_data['choices'][0]['message']['content']
+            except Exception as e:
+                print(f"Groq API error for model {g_model}: {e}")
+                continue
 
     # Fallback to Gemini if configured
     if gemini_model:
@@ -244,7 +263,7 @@ def _template_intervention(name, grade, guardian_name, phone, risk_level, signal
 
 async def chat_with_ustaad_ai(prompt: str, context_students: list = None) -> dict:
     sys_prompt = (
-        "You are 'Ustaad AI' (استاد اے آئی), an expert AI assistant powered by Groq Llama-3.3-70B-Instruct for Pakistani educators. "
+        "You are 'Ustaad AI' (استاد اے آئی), an expert AI assistant powered by Groq llama-3.3-70b-versatile for Pakistani educators. "
         "Help teachers analyze student dropout risk, draft personalized parent messages in English & Urdu, "
         "and suggest effective interventions. Be practical, empathetic, structured, and use bullet points."
     )
@@ -263,7 +282,7 @@ def _fallback_chat(prompt: str, context_students: list = None) -> dict:
     p_lower = prompt.lower().strip()
     if "highest risk" in p_lower or "high risk" in p_lower:
         resp = (
-            "⚠️ **Highest Dropout Risk Students Summary (Llama-3.3-70B Analysis)**\n\n"
+            "⚠️ **Highest Dropout Risk Students Summary (llama-3.3-70b-versatile Analysis)**\n\n"
             "Based on live Ustaad's Eye monitoring algorithms:\n\n"
             "1. **Fatima Bibi (Grade 8-A)** — 🚨 **92% Risk Score (HIGH)**\n"
             "   - Attendance: 42% (Critical drop over past 10 days)\n"
@@ -289,7 +308,7 @@ def _fallback_chat(prompt: str, context_students: list = None) -> dict:
         )
     else:
         resp = (
-            f"🤖 **Ustaad AI Response (Llama-3.3-70B Engine)**\n\n"
+            f"🤖 **Ustaad AI Response (llama-3.3-70b-versatile Engine)**\n\n"
             f"Thank you for asking: *\"{prompt}\"*\n\n"
             "As your Ustaad AI Assistant (استاد اے آئی اسسٹنٹ), I can help you analyze student dropout risks, draft personalized parent intervention messages in English & Urdu, review fee payment trends, and generate progress reports.\n\n"
             "Try clicking one of the suggested quick prompts below or ask a specific question!"
