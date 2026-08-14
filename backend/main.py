@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -32,6 +32,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+api = APIRouter()
 
 # ── Serve React frontend static build (for Render one-service deployment) ──
 FRONTEND_BUILD = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
@@ -96,12 +98,12 @@ def get_latest_risk(student: Student) -> dict:
 # ─────────────────────────────────────────────────────────────────────────────
 # Students
 # ─────────────────────────────────────────────────────────────────────────────
-@app.get("/students", response_model=List[StudentOut])
+@api.get("/students", response_model=List[StudentOut])
 def list_students(db: Session = Depends(get_db)):
     return db.query(Student).all()
 
 
-@app.post("/students", response_model=StudentOut)
+@api.post("/students", response_model=StudentOut)
 def create_student(data: StudentCreate, db: Session = Depends(get_db)):
     student = Student(**data.model_dump())
     db.add(student)
@@ -110,7 +112,7 @@ def create_student(data: StudentCreate, db: Session = Depends(get_db)):
     return student
 
 
-@app.get("/students/{student_id}", response_model=StudentOut)
+@api.get("/students/{student_id}", response_model=StudentOut)
 def get_student(student_id: int, db: Session = Depends(get_db)):
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
@@ -118,7 +120,7 @@ def get_student(student_id: int, db: Session = Depends(get_db)):
     return student
 
 
-@app.delete("/students/{student_id}")
+@api.delete("/students/{student_id}")
 def delete_student(student_id: int, db: Session = Depends(get_db)):
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
@@ -131,7 +133,7 @@ def delete_student(student_id: int, db: Session = Depends(get_db)):
 # ─────────────────────────────────────────────────────────────────────────────
 # Attendance
 # ─────────────────────────────────────────────────────────────────────────────
-@app.post("/students/{student_id}/attendance", response_model=AttendanceOut)
+@api.post("/students/{student_id}/attendance", response_model=AttendanceOut)
 def log_attendance(student_id: int, data: AttendanceCreate, db: Session = Depends(get_db)):
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
@@ -143,7 +145,7 @@ def log_attendance(student_id: int, data: AttendanceCreate, db: Session = Depend
     return record
 
 
-@app.get("/students/{student_id}/attendance", response_model=List[AttendanceOut])
+@api.get("/students/{student_id}/attendance", response_model=List[AttendanceOut])
 def get_attendance(student_id: int, db: Session = Depends(get_db)):
     return db.query(AttendanceRecord).filter(
         AttendanceRecord.student_id == student_id
@@ -153,7 +155,7 @@ def get_attendance(student_id: int, db: Session = Depends(get_db)):
 # ─────────────────────────────────────────────────────────────────────────────
 # Scores
 # ─────────────────────────────────────────────────────────────────────────────
-@app.post("/students/{student_id}/scores", response_model=ScoreOut)
+@api.post("/students/{student_id}/scores", response_model=ScoreOut)
 def log_score(student_id: int, data: ScoreCreate, db: Session = Depends(get_db)):
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
@@ -165,7 +167,7 @@ def log_score(student_id: int, data: ScoreCreate, db: Session = Depends(get_db))
     return record
 
 
-@app.get("/students/{student_id}/scores", response_model=List[ScoreOut])
+@api.get("/students/{student_id}/scores", response_model=List[ScoreOut])
 def get_scores(student_id: int, db: Session = Depends(get_db)):
     return db.query(ScoreRecord).filter(
         ScoreRecord.student_id == student_id
@@ -175,7 +177,7 @@ def get_scores(student_id: int, db: Session = Depends(get_db)):
 # ─────────────────────────────────────────────────────────────────────────────
 # Fees
 # ─────────────────────────────────────────────────────────────────────────────
-@app.post("/students/{student_id}/fees", response_model=FeeOut)
+@api.post("/students/{student_id}/fees", response_model=FeeOut)
 def log_fee(student_id: int, data: FeeCreate, db: Session = Depends(get_db)):
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
@@ -187,7 +189,7 @@ def log_fee(student_id: int, data: FeeCreate, db: Session = Depends(get_db)):
     return record
 
 
-@app.get("/students/{student_id}/fees", response_model=List[FeeOut])
+@api.get("/students/{student_id}/fees", response_model=List[FeeOut])
 def get_fees(student_id: int, db: Session = Depends(get_db)):
     return db.query(FeeRecord).filter(
         FeeRecord.student_id == student_id
@@ -197,7 +199,7 @@ def get_fees(student_id: int, db: Session = Depends(get_db)):
 # ─────────────────────────────────────────────────────────────────────────────
 # AI Analysis & Interventions
 # ─────────────────────────────────────────────────────────────────────────────
-@app.get("/students/{student_id}/analysis")
+@api.get("/students/{student_id}/analysis")
 async def analyze_student(student_id: int, db: Session = Depends(get_db)):
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
@@ -208,7 +210,7 @@ async def analyze_student(student_id: int, db: Session = Depends(get_db)):
     return {**metrics, **risk_data}
 
 
-@app.post("/students/{student_id}/intervention", response_model=InterventionOut)
+@api.post("/students/{student_id}/intervention", response_model=InterventionOut)
 async def generate_intervention(student_id: int, db: Session = Depends(get_db)):
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
@@ -240,7 +242,7 @@ async def generate_intervention(student_id: int, db: Session = Depends(get_db)):
     return intervention
 
 
-@app.patch("/interventions/{intervention_id}/action", response_model=InterventionOut)
+@api.patch("/interventions/{intervention_id}/action", response_model=InterventionOut)
 def action_intervention(intervention_id: int, db: Session = Depends(get_db)):
     intervention = db.query(Intervention).filter(Intervention.id == intervention_id).first()
     if not intervention:
@@ -252,7 +254,7 @@ def action_intervention(intervention_id: int, db: Session = Depends(get_db)):
     return intervention
 
 
-@app.get("/interventions", response_model=List[InterventionOut])
+@api.get("/interventions", response_model=List[InterventionOut])
 def list_interventions(db: Session = Depends(get_db)):
     return db.query(Intervention).order_by(Intervention.created_at.desc()).all()
 
@@ -260,7 +262,7 @@ def list_interventions(db: Session = Depends(get_db)):
 # ─────────────────────────────────────────────────────────────────────────────
 # Student History (for charts)
 # ─────────────────────────────────────────────────────────────────────────────
-@app.get("/students/{student_id}/history")
+@api.get("/students/{student_id}/history")
 def get_student_history(student_id: int, db: Session = Depends(get_db)):
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
@@ -326,7 +328,7 @@ def get_student_history(student_id: int, db: Session = Depends(get_db)):
 # ─────────────────────────────────────────────────────────────────────────────
 # Dashboard
 # ─────────────────────────────────────────────────────────────────────────────
-@app.get("/dashboard")
+@api.get("/dashboard")
 def get_dashboard(db: Session = Depends(get_db)):
     students = db.query(Student).all()
     summaries = []
@@ -560,11 +562,27 @@ async def seed_demo_data():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Mount API Router (both with /api prefix and without)
+# ─────────────────────────────────────────────────────────────────────────────
+app.include_router(api, prefix="/api")
+app.include_router(api)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Serve React Frontend (Render one-service deployment) — MUST BE LAST
 # ─────────────────────────────────────────────────────────────────────────────
 if os.path.exists(FRONTEND_BUILD):
-    app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_BUILD, "assets")), name="assets")
+    # Mount assets folder
+    assets_dir = os.path.join(FRONTEND_BUILD, "assets")
+    if os.path.exists(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
     @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_react(full_path: str):
+        # If specific static file exists in dist (e.g. manifest.json, sw.js, favicon.svg)
+        if full_path:
+            file_path = os.path.join(FRONTEND_BUILD, full_path)
+            if os.path.exists(file_path) and os.path.isfile(file_path):
+                return FileResponse(file_path)
         return FileResponse(os.path.join(FRONTEND_BUILD, "index.html"))
+

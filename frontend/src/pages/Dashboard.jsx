@@ -28,13 +28,25 @@ function FeeTag({ status }) {
 }
 
 export default function Dashboard() {
-  const [data, setData] = useState(null)
+  const [data, setData] = useState({ total_students: 0, high_risk: 0, medium_risk: 0, low_risk: 0, students: [] })
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [filter, setFilter] = useState('ALL')
   const navigate = useNavigate()
 
   useEffect(() => {
-    axios.get(`${API}/dashboard`).then((r) => { setData(r.data); setLoading(false) })
+    axios.get(`${API}/dashboard`)
+      .then((r) => {
+        if (r.data && Array.isArray(r.data.students)) {
+          setData(r.data)
+        }
+        setLoading(false)
+      })
+      .catch((err) => {
+        console.error("Failed to load dashboard:", err)
+        setError("Could not connect to server. Please check backend connection.")
+        setLoading(false)
+      })
   }, [])
 
   if (loading) return (
@@ -47,16 +59,23 @@ export default function Dashboard() {
     </div>
   )
 
-  const filtered = data.students.filter((s) => filter === 'ALL' || s.risk_level === filter)
+  const studentList = data?.students || []
+  const filtered = studentList.filter((s) => filter === 'ALL' || s.risk_level === filter)
 
   return (
     <div>
       <div className="page-header">
         <div className="page-title">🏫 Class Overview</div>
         <div className="page-subtitle">
-          Monitoring {data.total_students} students — updated just now
+          Monitoring {data?.total_students || 0} students — updated just now
         </div>
       </div>
+
+      {error && (
+        <div style={{ background: 'rgba(255, 71, 87, 0.15)', border: '1px solid var(--risk-high-border)', padding: '12px 16px', borderRadius: '8px', marginBottom: '20px', color: '#ff6b81' }}>
+          ⚠️ {error}
+        </div>
+      )}
 
       {/* Stats */}
       <div className="stats-grid">
