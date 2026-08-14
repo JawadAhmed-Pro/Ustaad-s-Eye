@@ -39,12 +39,12 @@ AI_ENABLED = bool(GROQ_API_KEY or (GEMINI_API_KEY and GEMINI_API_KEY != "your_ge
 def call_llm(prompt: str, system_prompt: str = "") -> str:
     """
     Calls Groq API (llama-3.3-70b-versatile) first.
-    If Groq fails, falls back to Gemini API (gemini-3.5-flash-lite).
+    If Groq fails or key is invalid, falls back to Gemini API / Local Engine.
     """
-    groq_key = os.getenv("GROQ_API_KEY", "")
+    groq_key = os.getenv("GROQ_API_KEY", "").strip().strip("'").strip('"')
     if groq_key and groq_key != "your_groq_api_key_here":
         groq_models = [
-            os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
+            os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile").strip(),
             "llama-3.3-70b-versatile",
             "llama-3.1-70b-versatile",
             "meta-llama/Llama-3.3-70B-Instruct",
@@ -56,7 +56,8 @@ def call_llm(prompt: str, system_prompt: str = "") -> str:
                 url = "https://api.groq.com/openai/v1/chat/completions"
                 headers = {
                     "Authorization": f"Bearer {groq_key}",
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
+                    "User-Agent": "UstaadEye/1.0"
                 }
                 messages = []
                 if system_prompt:
@@ -74,8 +75,13 @@ def call_llm(prompt: str, system_prompt: str = "") -> str:
                 with urllib.request.urlopen(req, timeout=6) as response:
                     res_data = json.loads(response.read().decode('utf-8'))
                     return res_data['choices'][0]['message']['content']
+            except urllib.error.HTTPError as http_err:
+                if http_err.code == 403 or http_err.code == 401:
+                    print("⚠️ Groq API Key invalid or unauthorized (403/401). Please check GROQ_API_KEY on Render.")
+                    break
+                print(f"Groq API error ({g_model}): {http_err}")
             except Exception as e:
-                print(f"Groq API error for model {g_model}: {e}")
+                print(f"Groq API error ({g_model}): {e}")
                 continue
 
     # Fallback to Gemini if configured
