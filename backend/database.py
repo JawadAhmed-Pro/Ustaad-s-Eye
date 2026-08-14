@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, Boolean, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, Boolean, ForeignKey, text
 from sqlalchemy.orm import sessionmaker, relationship, DeclarativeBase
 from datetime import datetime
 
@@ -20,6 +20,7 @@ class Student(Base):
     roll_number = Column(String(20), unique=True)
     guardian_name = Column(String(100))
     guardian_phone = Column(String(20))
+    retention_status = Column(String(30), default="AT_RISK")
     created_at = Column(DateTime, default=datetime.utcnow)
 
     attendance_records = relationship("AttendanceRecord", back_populates="student", cascade="all, delete")
@@ -80,6 +81,9 @@ class Intervention(Base):
     parent_sms = Column(Text)
     counselor_alert = Column(Text)
     meeting_agenda = Column(Text)
+    urdu_voice_script = Column(Text, nullable=True)
+    dropout_stage = Column(Integer, default=1)
+    retention_status = Column(String(30), default="AT_RISK")
     actioned = Column(Boolean, default=False)
     actioned_at = Column(DateTime, nullable=True)
 
@@ -96,3 +100,17 @@ def get_db():
 
 def create_tables():
     Base.metadata.create_all(bind=engine)
+    with engine.connect() as conn:
+        try:
+            result = conn.execute(text("PRAGMA table_info(interventions)")).fetchall()
+            columns = [row[1] for row in result]
+            if "dropout_stage" not in columns:
+                conn.execute(text("ALTER TABLE interventions ADD COLUMN dropout_stage INTEGER DEFAULT 1"))
+            if "urdu_voice_script" not in columns:
+                conn.execute(text("ALTER TABLE interventions ADD COLUMN urdu_voice_script TEXT"))
+            if "retention_status" not in columns:
+                conn.execute(text("ALTER TABLE interventions ADD COLUMN retention_status VARCHAR(30) DEFAULT 'AT_RISK'"))
+            conn.commit()
+        except Exception as e:
+            print(f"Migration notice: {e}")
+

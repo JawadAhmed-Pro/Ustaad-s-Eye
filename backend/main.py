@@ -17,8 +17,8 @@ from models import (
     AttendanceCreate, AttendanceOut,
     ScoreCreate, ScoreOut,
     FeeCreate, FeeOut,
-    InterventionOut,
-    StudentRiskSummary, DashboardOut,
+    InterventionOut, RetentionUpdate,
+    StudentRiskSummary, DashboardOut, DropoutStagesBreakdown, ConsecutiveAbsenceAlert,
     StudentHistory,
     ChatRequest, SimulationRequest
 )
@@ -53,9 +53,18 @@ async def startup():
 # ─────────────────────────────────────────────────────────────────────────────
 def compute_student_metrics(student: Student) -> dict:
     records = student.attendance_records
-    total = len(records)
-    present = sum(1 for r in records if r.present)
+    sorted_records = sorted(records, key=lambda x: x.date)
+    total = len(sorted_records)
+    present = sum(1 for r in sorted_records if r.present)
     attendance_rate = (present / total * 100) if total > 0 else 100.0
+
+    # Calculate consecutive_absences: Count consecutive present == False ending on latest attendance record date
+    consecutive_absences = 0
+    for r in reversed(sorted_records):
+        if not r.present:
+            consecutive_absences += 1
+        else:
+            break
 
     scores = student.score_records
     if scores:
@@ -71,7 +80,23 @@ def compute_student_metrics(student: Student) -> dict:
     fee_history = [f.status for f in sorted(fees, key=lambda x: (x.year, x.month))[-3:]]
     latest_fee = fees[-1].status if fees else "paid"
 
-    recent_att = [r.present for r in sorted(records, key=lambda x: x.date)[-10:]]
+    recent_att = [r.present for r in sorted_records[-10:]]
+
+    # Calculate dropout_stage (int 1-4, or 0 if none)
+    # Stage 4 (Imminent Dropout): 3+ consecutive absences AND avg score < 40% AND fee overdue >= 2 months
+    # Stage 3 (Family/Fee Hesitation): Attendance < 60% AND fee overdue >= 2 months
+    # Stage 2 (Academic Slip): Attendance < 65% AND avg score < 50%
+    # Stage 1 (Absenteeism Spike): 2+ consecutive absences OR attendance 65-75%
+    if consecutive_absences >= 3 and avg_score < 40.0 and fee_overdue >= 2:
+        dropout_stage = 4
+    elif attendance_rate < 60.0 and fee_overdue >= 2:
+        dropout_stage = 3
+    elif attendance_rate < 65.0 and avg_score < 50.0:
+        dropout_stage = 2
+    elif consecutive_absences >= 2 or (65.0 <= attendance_rate <= 75.0):
+        dropout_stage = 1
+    else:
+        dropout_stage = 0
 
     return {
         "name": student.name,
@@ -79,6 +104,8 @@ def compute_student_metrics(student: Student) -> dict:
         "attendance_rate": round(attendance_rate, 1),
         "avg_score": round(avg_score, 1),
         "fee_overdue_months": fee_overdue,
+        "consecutive_absences": consecutive_absences,
+        "dropout_stage": dropout_stage,
         "recent_attendance": recent_att,
         "recent_scores": recent_scores,
         "fee_history": fee_history,
@@ -93,8 +120,19 @@ def get_latest_risk(student: Student) -> dict:
             "risk_level": latest.risk_level,
             "risk_score": latest.risk_score,
             "last_analysis": latest.created_at,
+            "retention_status": getattr(latest, "retention_status", "AT_RISK") or "AT_RISK",
+            "dropout_stage": getattr(latest, "dropout_stage", 1) or 1,
+            "urdu_voice_script": getattr(latest, "urdu_voice_script", None),
         }
-    return {"risk_level": "UNKNOWN", "risk_score": 0, "last_analysis": None}
+    return {
+        "risk_level": "UNKNOWN",
+        "risk_score": 0,
+        "last_analysis": None,
+        "retention_status": "AT_RISK",
+        "dropout_stage": 0,
+        "urdu_voice_script": None,
+    }
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -444,6 +482,7 @@ async def generate_intervention(student_id: int, db: Session = Depends(get_db)):
         guardian_name=student.guardian_name or "Guardian",
         guardian_phone=student.guardian_phone or "N/A",
         risk_data=risk_data,
+        consecutive_absences=metrics["consecutive_absences"],
     )
 
     intervention = Intervention(
@@ -454,11 +493,15 @@ async def generate_intervention(student_id: int, db: Session = Depends(get_db)):
         parent_sms=intervention_drafts["parent_sms"],
         counselor_alert=intervention_drafts["counselor_alert"],
         meeting_agenda=intervention_drafts["meeting_agenda"],
+        urdu_voice_script=intervention_drafts.get("urdu_voice_script", ""),
+        dropout_stage=metrics["dropout_stage"] or 1,
+        retention_status="AT_RISK",
     )
     db.add(intervention)
     db.commit()
     db.refresh(intervention)
     return intervention
+
 
 
 @api.patch("/interventions/{intervention_id}/action", response_model=InterventionOut)
@@ -471,6 +514,26 @@ def action_intervention(intervention_id: int, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(intervention)
     return intervention
+
+
+@api.patch("/interventions/{intervention_id}/retention", response_model=InterventionOut)
+def update_intervention_retention(intervention_id: int, req: RetentionUpdate, db: Session = Depends(get_db)):
+    intervention = db.query(Intervention).filter(Intervention.id == intervention_id).first()
+    if not intervention:
+        raise HTTPException(status_code=404, detail="Intervention not found")
+
+    valid_statuses = {"AT_RISK", "OUTREACH_SENT", "RECOVERING", "SAVED_RETAINED"}
+    if req.retention_status not in valid_statuses:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid retention_status. Must be one of: {', '.join(valid_statuses)}"
+        )
+
+    intervention.retention_status = req.retention_status
+    db.commit()
+    db.refresh(intervention)
+    return intervention
+
 
 
 @api.get("/interventions", response_model=List[InterventionOut])
@@ -539,6 +602,9 @@ def get_student_history(student_id: int, db: Session = Depends(get_db)):
             "meeting_agenda": li.meeting_agenda,
             "actioned": li.actioned,
             "actioned_at": li.actioned_at.isoformat() if li.actioned_at else None,
+            "retention_status": getattr(li, "retention_status", "AT_RISK") or "AT_RISK",
+            "dropout_stage": getattr(li, "dropout_stage", 1) or 1,
+            "urdu_voice_script": getattr(li, "urdu_voice_script", None),
             "created_at": li.created_at.isoformat(),
         }
 
@@ -583,7 +649,7 @@ def get_student_history(student_id: int, db: Session = Depends(get_db)):
 # ─────────────────────────────────────────────────────────────────────────────
 # Dashboard
 # ─────────────────────────────────────────────────────────────────────────────
-@api.get("/dashboard")
+@api.get("/dashboard", response_model=DashboardOut)
 def get_dashboard(db: Session = Depends(get_db)):
     students = db.query(Student).all()
     summaries = []
@@ -602,6 +668,9 @@ def get_dashboard(db: Session = Depends(get_db)):
             "avg_score": metrics["avg_score"],
             "fee_status": metrics["latest_fee_status"],
             "last_analysis": latest_risk["last_analysis"].isoformat() if latest_risk["last_analysis"] else None,
+            "consecutive_absences": metrics["consecutive_absences"],
+            "dropout_stage": metrics["dropout_stage"],
+            "retention_status": latest_risk["retention_status"],
         })
 
     summaries.sort(key=lambda x: x["risk_score"], reverse=True)
@@ -610,13 +679,41 @@ def get_dashboard(db: Session = Depends(get_db)):
     medium = sum(1 for s in summaries if s["risk_level"] == "MEDIUM")
     low = sum(1 for s in summaries if s["risk_level"] in ("LOW", "UNKNOWN"))
 
-    return {
-        "total_students": len(students),
-        "high_risk": high,
-        "medium_risk": medium,
-        "low_risk": low,
-        "students": summaries,
-    }
+    dropout_stages = DropoutStagesBreakdown(
+        stage1_count=sum(1 for s in summaries if s["dropout_stage"] == 1),
+        stage2_count=sum(1 for s in summaries if s["dropout_stage"] == 2),
+        stage3_count=sum(1 for s in summaries if s["dropout_stage"] == 3),
+        stage4_count=sum(1 for s in summaries if s["dropout_stage"] == 4),
+    )
+
+    consecutive_absence_alerts = [
+        ConsecutiveAbsenceAlert(
+            student_id=s["student_id"],
+            name=s["name"],
+            grade=s["grade"],
+            consecutive_absences=s["consecutive_absences"],
+            dropout_stage=s["dropout_stage"],
+            guardian_phone=s["guardian_phone"],
+        )
+        for s in summaries
+        if s["consecutive_absences"] >= 2
+    ]
+    consecutive_absence_alerts.sort(key=lambda x: x.consecutive_absences, reverse=True)
+
+    saved_students_count = sum(1 for s in summaries if s["retention_status"] == "SAVED_RETAINED")
+
+    return DashboardOut(
+        total_students=len(students),
+        high_risk=high,
+        medium_risk=medium,
+        low_risk=low,
+        dropout_stages=dropout_stages,
+        consecutive_absence_alerts=consecutive_absence_alerts,
+        saved_students_count=saved_students_count,
+        students=summaries,
+    )
+
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -772,7 +869,9 @@ async def seed_demo_data():
                     guardian_name=student.guardian_name or "Guardian",
                     guardian_phone=student.guardian_phone or "N/A",
                     risk_data=risk_data,
+                    consecutive_absences=metrics["consecutive_absences"],
                 )
+                ret_stat = "OUTREACH_SENT" if local["risk_level"] == "MEDIUM" else "AT_RISK"
                 intervention = Intervention(
                     student_id=student.id,
                     risk_level=risk_data["risk_level"],
@@ -781,10 +880,13 @@ async def seed_demo_data():
                     parent_sms=drafts["parent_sms"],
                     counselor_alert=drafts["counselor_alert"],
                     meeting_agenda=drafts["meeting_agenda"],
+                    urdu_voice_script=drafts.get("urdu_voice_script", ""),
+                    dropout_stage=metrics["dropout_stage"] or 1,
+                    retention_status=ret_stat,
                 )
                 db.add(intervention)
 
-        # Also seed LOW risk students with basic analysis
+        # Also seed LOW risk students with basic analysis and SAVED_RETAINED status
         for student in db_students:
             metrics = compute_student_metrics(student)
             from ai import compute_local_risk
@@ -795,16 +897,28 @@ async def seed_demo_data():
             )
             if local["risk_level"] == "LOW":
                 risk_data = await analyze_student_risk(metrics)
+                drafts = await draft_intervention(
+                    student_name=student.name,
+                    grade=student.grade,
+                    guardian_name=student.guardian_name or "Guardian",
+                    guardian_phone=student.guardian_phone or "N/A",
+                    risk_data=risk_data,
+                    consecutive_absences=metrics["consecutive_absences"],
+                )
                 intervention = Intervention(
                     student_id=student.id,
                     risk_level=risk_data["risk_level"],
                     risk_score=risk_data["risk_score"],
                     risk_explanation=risk_data["risk_explanation"],
-                    parent_sms="",
-                    counselor_alert="",
-                    meeting_agenda="",
+                    parent_sms=drafts["parent_sms"],
+                    counselor_alert=drafts["counselor_alert"],
+                    meeting_agenda=drafts["meeting_agenda"],
+                    urdu_voice_script=drafts.get("urdu_voice_script", ""),
+                    dropout_stage=metrics["dropout_stage"] or 1,
+                    retention_status="SAVED_RETAINED",
                 )
                 db.add(intervention)
+
 
         db.commit()
         print("✅ Initial risk analysis complete")

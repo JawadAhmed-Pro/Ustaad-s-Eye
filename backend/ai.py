@@ -208,7 +208,8 @@ Respond in this EXACT JSON format (no markdown, just raw JSON):
 
 
 async def draft_intervention(student_name: str, grade: str, guardian_name: str,
-                               guardian_phone: str, risk_data: dict) -> dict:
+                               guardian_phone: str, risk_data: dict,
+                               consecutive_absences: int = 0) -> dict:
     risk_level = risk_data.get("risk_level", "MEDIUM")
     explanation = risk_data.get("risk_explanation", "")
     signals = risk_data.get("signals", [])
@@ -218,12 +219,14 @@ async def draft_intervention(student_name: str, grade: str, guardian_name: str,
 Student: {student_name}, Grade {grade}
 Guardian: {guardian_name}, Phone: {guardian_phone}
 Risk Level: {risk_level}
+Consecutive Absences: {consecutive_absences}
 Risk Explanation: {explanation}
 Warning Signals: {', '.join(signals)}
 
-Generate three communications in this EXACT JSON format (no markdown, raw JSON only):
+Generate four communications in this EXACT JSON format (no markdown, raw JSON only):
 {{
   "parent_sms": "<Short empathetic SMS message in Urdu/English for parent/guardian, max 160 chars>",
+  "urdu_voice_script": "<A spoken 20-second Urdu Voice Note transcript for WhatsApp in Urdu script, e.g. 'السلام علیکم! میں اسکول سے استاد بات کر رہا ہوں۔ فاطمہ کی پچھلے 3 دن سے حاضری نہ ہونے کی وجہ سے ہم پریشان ہیں...'>",
   "counselor_alert": "<Alert message for school counselor/admin, professional, 3-4 sentences>",
   "meeting_agenda": "<Bullet-point agenda for a follow-up meeting with parent, 4-5 items>"
 }}
@@ -239,19 +242,33 @@ Generate three communications in this EXACT JSON format (no markdown, raw JSON o
             if text.startswith("json"):
                 text = text[4:]
         result = json.loads(text.strip())
+        if "urdu_voice_script" not in result:
+            result["urdu_voice_script"] = _template_intervention(
+                student_name, grade, guardian_name, guardian_phone, risk_level, signals, consecutive_absences
+            )["urdu_voice_script"]
         return result
     except Exception as e:
         print(f"LLM draft intervention fallback: {e}")
-        return _template_intervention(student_name, grade, guardian_name, guardian_phone, risk_level, signals)
+        return _template_intervention(student_name, grade, guardian_name, guardian_phone, risk_level, signals, consecutive_absences)
 
 
-def _template_intervention(name, grade, guardian_name, phone, risk_level, signals):
+def _template_intervention(name, grade, guardian_name, phone, risk_level, signals, consecutive_absences=0):
     urgency = "urgently" if risk_level == "HIGH" else "soon"
+    g_name = guardian_name if guardian_name else "والدین"
+    abs_text = f"پچھلے {consecutive_absences} دن" if consecutive_absences > 0 else "حالیہ دنوں"
+
+    urdu_voice = (
+        f"السلام علیکم {g_name} صاحب! میں اسکول سے استاد بات کر رہا ہوں۔ "
+        f"{name} کی {abs_text} سے حاضری نہ ہونے کی وجہ سے ہم پریشان ہیں اور چاہتے ہیں کہ ان کی تعلیم بلا تطل جاری رہے۔ "
+        f"برائے کرم اسکول انتظامیہ سے جلد از جلد رابطہ فرمائیں تاکہ ہم مل کر مدد کر سکیں۔ شکریہ!"
+    )
+
     return {
         "parent_sms": (
             f"Dear {guardian_name}, {name} (Grade {grade}) needs {urgency} support. "
             f"Please contact Ustaad's Eye School at your earliest. We care about {name}'s future."
         )[:160],
+        "urdu_voice_script": urdu_voice,
         "counselor_alert": (
             f"ALERT [{risk_level} RISK]: {name}, Grade {grade}. "
             f"Warning signals detected: {', '.join(signals) if signals else 'Multiple signals'}. "
@@ -265,6 +282,7 @@ def _template_intervention(name, grade, guardian_name, phone, risk_level, signal
             "• Set follow-up date within 1 week"
         ),
     }
+
 
 
 async def chat_with_ustaad_ai(prompt: str, context_students: list = None) -> dict:

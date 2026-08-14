@@ -28,11 +28,26 @@ function FeeTag({ status }) {
   return <span className={cls} style={{ fontSize: 13, fontWeight: 600 }}>{icon} {label}</span>
 }
 
+function getStudentStage(s) {
+  if (s.dropout_stage && s.dropout_stage >= 1 && s.dropout_stage <= 4) {
+    return s.dropout_stage
+  }
+  const ca = s.consecutive_absences || 0
+  const att = s.attendance_rate || 100
+  const score = s.risk_score || 0
+  const fee = s.fee_status || 'paid'
+  if (ca >= 3 || att < 50 || score >= 75) return 4
+  if (fee === 'overdue' || (att < 65 && fee === 'pending') || score >= 55) return 3
+  if (s.avg_score < 50 || att < 80 || score >= 35) return 2
+  return 1
+}
+
 export default function Dashboard() {
-  const [data, setData] = useState({ total_students: 0, high_risk: 0, medium_risk: 0, low_risk: 0, students: [] })
+  const [data, setData] = useState({ total_students: 0, high_risk: 0, medium_risk: 0, low_risk: 0, saved_retained: 0, students: [] })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [filter, setFilter] = useState('ALL')
+  const [stageFilter, setStageFilter] = useState('ALL')
   const [seeding, setSeeding] = useState(false)
   const toast = useToast()
 
@@ -93,7 +108,14 @@ export default function Dashboard() {
   )
 
   const studentList = data?.students || []
-  const filtered = studentList.filter((s) => filter === 'ALL' || s.risk_level === filter)
+  const urgentAbsenceStudents = studentList.filter((s) => (s.consecutive_absences || 0) >= 3)
+  const savedCount = data.saved_retained ?? studentList.filter((s) => s.retention_status === 'SAVED_RETAINED' || s.risk_level === 'LOW').length
+
+  const filtered = studentList.filter((s) => {
+    const matchesRisk = filter === 'ALL' || s.risk_level === filter
+    const matchesStage = stageFilter === 'ALL' || getStudentStage(s) === stageFilter
+    return matchesRisk && matchesStage
+  })
 
   // Calculate dynamic simulation preview
   const originalHigh = data.high_risk || 0
@@ -102,6 +124,58 @@ export default function Dashboard() {
 
   return (
     <div>
+      {/* 🚨 Consecutive Absence Alarm Bar (Top of Dashboard) */}
+      {urgentAbsenceStudents.length > 0 && (
+        <div
+          style={{
+            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.22), rgba(153, 27, 27, 0.35))',
+            border: '2px solid var(--risk-high)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '16px 20px',
+            marginBottom: 24,
+            boxShadow: '0 0 25px rgba(239, 68, 68, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 16,
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 1, minWidth: 280 }}>
+            <span style={{ fontSize: 32 }}>🚨</span>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span>CONSECUTIVE ABSENCE ALARM BAR</span>
+                <span style={{ background: 'var(--risk-high)', color: '#fff', fontSize: 11, padding: '2px 8px', borderRadius: 10, fontWeight: 800 }}>
+                  {urgentAbsenceStudents.length} CRITICAL
+                </span>
+              </div>
+              <div style={{ fontSize: 14, color: '#fca5a5', marginTop: 4, fontWeight: 600 }}>
+                🚨 URGENT: {urgentAbsenceStudents.map(s => `${s.name} has missed ${s.consecutive_absences || 3} consecutive days of school this week!`).join(' | ')}
+              </div>
+              <div style={{ fontFamily: 'var(--font-urdu)', fontSize: 13, color: 'var(--gold-light)', marginTop: 2 }}>
+                فوری اطلاع: طالبات مسلسل 3 یا زائد دنوں سے غیر حاضر ہیں!
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
+            <button
+              className="btn btn-gold btn-sm"
+              style={{ fontWeight: 800, color: '#05140d' }}
+              onClick={() => navigate(`/student/${urgentAbsenceStudents[0].student_id}`)}
+            >
+              📲 Review Student
+            </button>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => setFilter('HIGH')}
+            >
+              Filter High Risk
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Page Header */}
       <div className="page-header">
         <div className="page-title-row" style={{ justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: 12 }}>
@@ -166,8 +240,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="stats-grid">
+      {/* Stats Grid including 🎉 Dropout Prevention Impact Counter */}
+      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
         <div className="stat-card">
           <div className="stat-label">Total Students</div>
           <div className="stat-value total">{data.total_students}</div>
@@ -188,6 +262,96 @@ export default function Dashboard() {
           <div className="stat-value low">{data.low_risk}</div>
           <div className="stat-sub">On track</div>
         </div>
+        <div className="stat-card" style={{ background: 'linear-gradient(135deg, rgba(0, 168, 89, 0.2), rgba(16, 185, 129, 0.1))', borderColor: 'var(--accent)' }}>
+          <div className="stat-label" style={{ color: 'var(--accent-light)' }}>🎉 Saved / Retained</div>
+          <div className="stat-value" style={{ color: 'var(--accent-light)' }}>
+            {savedCount} <span style={{ fontSize: 16, color: 'var(--text-muted)', fontWeight: 600 }}>/ {data.total_students}</span>
+          </div>
+          <div className="stat-sub" style={{ color: 'var(--gold-light)', fontWeight: 700 }}>
+            Dropout Prevention Impact Counter
+          </div>
+        </div>
+      </div>
+
+      {/* 📊 4-Stage Dropout Escalation Pipeline View Section */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <h2 className="section-title" style={{ margin: 0 }}>
+              📊 4-Stage Dropout Escalation Pipeline
+            </h2>
+            <div style={{ fontFamily: 'var(--font-urdu)', fontSize: 14, color: 'var(--gold-light)', marginTop: 2 }}>
+              سلسلہ وار ڈراپ اؤٹ کی روک تھام اور ترجیحی نگرانی
+            </div>
+          </div>
+          {stageFilter !== 'ALL' && (
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => setStageFilter('ALL')}
+            >
+              🔄 Reset Stage Filter (Show All Stages)
+            </button>
+          )}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
+          {[
+            { stage: 1, title: 'Stage 1', name: 'Absenteeism Spike', urdu: 'حاضری میں کمی', desc: 'Initial attendance drop warning', icon: '⚠️', color: '#10b981', bg: 'rgba(16, 185, 129, 0.12)', border: 'rgba(16, 185, 129, 0.4)' },
+            { stage: 2, title: 'Stage 2', name: 'Academic Slip', urdu: 'تعلیمی تنزلی', desc: 'Failing scores & minor absenteeism', icon: '📉', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.12)', border: 'rgba(245, 158, 11, 0.4)' },
+            { stage: 3, title: 'Stage 3', name: 'Family/Fee Hesitation', urdu: 'مالی / خاندانی مسائل', desc: 'Fee overdue & guardian hesitation', icon: '💰', color: '#f97316', bg: 'rgba(249, 115, 22, 0.12)', border: 'rgba(249, 115, 22, 0.4)' },
+            { stage: 4, title: 'Stage 4', name: 'Imminent Dropout', urdu: 'اسکول چھوڑنے کا خدشہ', desc: 'Critical risk, 3+ consecutive absences', icon: '🚨', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.12)', border: 'rgba(239, 68, 68, 0.4)' },
+          ].map((s) => {
+            const count = studentList.filter(stu => getStudentStage(stu) === s.stage).length
+            const isSelected = stageFilter === s.stage
+            return (
+              <div
+                key={s.stage}
+                onClick={() => setStageFilter(isSelected ? 'ALL' : s.stage)}
+                style={{
+                  background: isSelected ? s.bg : 'var(--bg-card)',
+                  border: `2px solid ${isSelected ? s.color : s.border}`,
+                  borderRadius: 'var(--radius-lg)',
+                  padding: 16,
+                  cursor: 'pointer',
+                  transition: 'all 0.25s ease',
+                  boxShadow: isSelected ? `0 0 20px ${s.bg}` : 'none',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: s.color, letterSpacing: '0.5px' }}>
+                    {s.icon} STAGE {s.stage}
+                  </span>
+                  <span style={{
+                    background: s.color,
+                    color: '#05140d',
+                    fontSize: 12,
+                    fontWeight: 900,
+                    padding: '2px 10px',
+                    borderRadius: 12,
+                  }}>
+                    {count} Student{count !== 1 ? 's' : ''}
+                  </span>
+                </div>
+
+                <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary)' }}>
+                  {s.name}
+                </div>
+                <div style={{ fontFamily: 'var(--font-urdu)', fontSize: 13, color: 'var(--gold-light)', marginTop: 2 }}>
+                  {s.urdu}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 6, lineHeight: 1.4 }}>
+                  {s.desc}
+                </div>
+
+                {isSelected && (
+                  <div style={{ marginTop: 10, fontSize: 11, fontWeight: 800, color: s.color, textAlign: 'right' }}>
+                    ✓ ACTIVE STAGE FILTER
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
       </div>
 
       {/* Warning Banner for HIGH RISK */}
@@ -202,7 +366,8 @@ export default function Dashboard() {
       )}
 
       {/* Filter Tabs */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-muted)' }}>Risk Level:</span>
         {['ALL', 'HIGH', 'MEDIUM', 'LOW'].map((f) => (
           <button
             key={f}
@@ -223,92 +388,121 @@ export default function Dashboard() {
             )}
           </button>
         ))}
+
+        {stageFilter !== 'ALL' && (
+          <span className="azadi-tag" style={{ background: 'var(--gold)', color: '#05140d', marginLeft: 'auto' }}>
+            Stage {stageFilter} Active
+          </span>
+        )}
       </div>
 
-      {/* Student Cards or Empty State */}
+      {/* Student Cards Grid or Empty State */}
       {filtered.length === 0 ? (
         <div className="empty-state card">
           <div className="empty-icon">🇵🇰</div>
           <div className="empty-title">کوئی طالبہ نہیں ملی / No Students Found</div>
           <div style={{ color: 'var(--text-secondary)', fontSize: 14, marginTop: 8 }}>
-            There are no students matching the filter "{filter}".
+            There are no students matching risk filter "{filter}" {stageFilter !== 'ALL' ? `and Stage ${stageFilter}` : ''}.
           </div>
-          <button className="btn btn-ghost btn-sm" style={{ marginTop: 16 }} onClick={() => setFilter('ALL')}>
+          <button className="btn btn-ghost btn-sm" style={{ marginTop: 16 }} onClick={() => { setFilter('ALL'); setStageFilter('ALL'); }}>
             Show All Students
           </button>
         </div>
       ) : (
         <div className="students-grid">
-          {filtered.map((student) => (
-            <div
-              key={student.student_id}
-              className={`student-card ${student.risk_level} ${student.risk_level === 'HIGH' ? 'pulse-high' : ''}`}
-              onClick={() => navigate(`/student/${student.student_id}`)}
-            >
-              <div className="student-card-top">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div className={`student-avatar ${getAvatarClass(student.risk_level)}`}>
-                    {getInitials(student.name)}
+          {filtered.map((student) => {
+            const stageNum = getStudentStage(student)
+            return (
+              <div
+                key={student.student_id}
+                className={`student-card ${student.risk_level} ${student.risk_level === 'HIGH' ? 'pulse-high' : ''}`}
+                onClick={() => navigate(`/student/${student.student_id}`)}
+              >
+                <div className="student-card-top">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div className={`student-avatar ${getAvatarClass(student.risk_level)}`}>
+                      {getInitials(student.name)}
+                    </div>
+                    <div>
+                      <div className="student-name">{student.name}</div>
+                      <div className="student-grade">Grade {student.grade} &nbsp;·&nbsp; Roll #{student.student_id}</div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="student-name">{student.name}</div>
-                    <div className="student-grade">Grade {student.grade} &nbsp;·&nbsp; Roll #{student.student_id}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                    <span className={`risk-badge ${student.risk_level}`}>
+                      {student.risk_level === 'HIGH' ? '🔴' : student.risk_level === 'MEDIUM' ? '🌙' : '⭐'} {student.risk_level}
+                    </span>
+                    <span style={{
+                      background: stageNum === 4 ? 'rgba(239,68,68,0.2)' : stageNum === 3 ? 'rgba(249,115,22,0.2)' : stageNum === 2 ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.2)',
+                      border: `1px solid ${stageNum === 4 ? '#ef4444' : stageNum === 3 ? '#f97316' : stageNum === 2 ? '#f59e0b' : '#10b981'}`,
+                      color: stageNum === 4 ? '#ef4444' : stageNum === 3 ? '#f97316' : stageNum === 2 ? '#f59e0b' : '#10b981',
+                      fontSize: 10,
+                      fontWeight: 800,
+                      padding: '2px 8px',
+                      borderRadius: 10,
+                    }}>
+                      Stage {stageNum}
+                    </span>
                   </div>
                 </div>
-                <span className={`risk-badge ${student.risk_level}`}>
-                  {student.risk_level === 'HIGH' ? '🔴' : student.risk_level === 'MEDIUM' ? '🌙' : '⭐'} {student.risk_level}
-                </span>
-              </div>
 
-              {/* Metrics */}
-              <div className="student-metrics">
-                <div className="metric-item">
-                  <div className="metric-value" style={{ color: student.attendance_rate < 65 ? 'var(--risk-high)' : student.attendance_rate < 80 ? 'var(--gold)' : 'var(--accent-light)' }}>
-                    {student.attendance_rate}%
+                {/* Metrics */}
+                <div className="student-metrics">
+                  <div className="metric-item">
+                    <div className="metric-value" style={{ color: student.attendance_rate < 65 ? 'var(--risk-high)' : student.attendance_rate < 80 ? 'var(--gold)' : 'var(--accent-light)' }}>
+                      {student.attendance_rate}%
+                    </div>
+                    <div className="metric-label">Attendance</div>
                   </div>
-                  <div className="metric-label">Attendance</div>
-                </div>
-                <div className="metric-item">
-                  <div className="metric-value" style={{ color: student.avg_score < 40 ? 'var(--risk-high)' : student.avg_score < 60 ? 'var(--gold)' : 'var(--accent-light)' }}>
-                    {student.avg_score}%
+                  <div className="metric-item">
+                    <div className="metric-value" style={{ color: student.avg_score < 40 ? 'var(--risk-high)' : student.avg_score < 60 ? 'var(--gold)' : 'var(--accent-light)' }}>
+                      {student.avg_score}%
+                    </div>
+                    <div className="metric-label">Avg Score</div>
                   </div>
-                  <div className="metric-label">Avg Score</div>
-                </div>
-                <div className="metric-item">
-                  <div className="metric-value">
-                    <FeeTag status={student.fee_status} />
+                  <div className="metric-item">
+                    <div className="metric-value">
+                      <FeeTag status={student.fee_status} />
+                    </div>
+                    <div className="metric-label">Fees</div>
                   </div>
-                  <div className="metric-label">Fees</div>
                 </div>
-              </div>
 
-              {/* Risk Score Bar */}
-              <div className="risk-score-bar">
-                <div className="risk-bar-label">
-                  <span>Risk Score</span>
-                  <span style={{ color: getRiskColor(student.risk_level), fontWeight: 700 }}>
-                    {student.risk_score}/100
+                {/* Risk Score Bar */}
+                <div className="risk-score-bar">
+                  <div className="risk-bar-label">
+                    <span>Risk Score</span>
+                    <span style={{ color: getRiskColor(student.risk_level), fontWeight: 700 }}>
+                      {student.risk_score}/100
+                    </span>
+                  </div>
+                  <div className="risk-bar-track">
+                    <div
+                      className="risk-bar-fill"
+                      style={{
+                        width: `${student.risk_score}%`,
+                        background: getRiskColor(student.risk_level),
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ marginTop: 14, fontSize: 12, color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>
+                    {(student.consecutive_absences || 0) >= 3 ? (
+                      <strong style={{ color: 'var(--risk-high)' }}>🚨 {student.consecutive_absences} days absent</strong>
+                    ) : (
+                      'Click for details & AI analysis'
+                    )}
                   </span>
-                </div>
-                <div className="risk-bar-track">
-                  <div
-                    className="risk-bar-fill"
-                    style={{
-                      width: `${student.risk_score}%`,
-                      background: getRiskColor(student.risk_level),
-                    }}
-                  />
+                  <span>→</span>
                 </div>
               </div>
-
-              <div style={{ marginTop: 14, fontSize: 12, color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between' }}>
-                <span>Click to view details & AI analysis</span>
-                <span>→</span>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
+
 
       {/* ⚡ Instant Class Risk Simulation Modal */}
       {showSimModal && (

@@ -11,6 +11,7 @@ const toLocalISO = (dateStr) => {
 export default function LogEntry() {
   const [students, setStudents] = useState([])
   const [selectedId, setSelectedId] = useState('')
+  const [selectedStudentDetail, setSelectedStudentDetail] = useState(null)
   const [tab, setTab] = useState('attendance')
   const [submitting, setSubmitting] = useState(false)
   const toast = useToast()
@@ -43,6 +44,27 @@ export default function LogEntry() {
     axios.get(`${API}/students`).then((r) => setStudents(r.data))
   }, [])
 
+  useEffect(() => {
+    if (!selectedId) {
+      setSelectedStudentDetail(null)
+      return
+    }
+    axios.get(`${API}/students/${selectedId}/history`)
+      .then((r) => setSelectedStudentDetail(r.data))
+      .catch(() => setSelectedStudentDetail(null))
+  }, [selectedId])
+
+  const getConsecutiveAbsences = (records) => {
+    if (!records || records.length === 0) return 0
+    const sorted = [...records].sort((a, b) => new Date(a.date) - new Date(b.date))
+    let count = 0
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      if (!sorted[i].present) count++
+      else break
+    }
+    return count
+  }
+
   const submitAttendance = async () => {
     if (!selectedId) return toast('Please select a student first', 'error')
     setSubmitting(true)
@@ -54,6 +76,8 @@ export default function LogEntry() {
       })
       toast(`✅ Attendance logged for ${students.find((s) => s.id == selectedId)?.name}`, 'success')
       setAttNotes('')
+      // Refresh student history
+      axios.get(`${API}/students/${selectedId}/history`).then((r) => setSelectedStudentDetail(r.data))
     } catch { toast('❌ Failed to log attendance', 'error') }
     setSubmitting(false)
   }
@@ -71,6 +95,8 @@ export default function LogEntry() {
       })
       toast(`✅ Score logged: ${scoreValue}/${scoreMax} in ${scoreSubject}`, 'success')
       setScoreValue('')
+      // Refresh student history
+      axios.get(`${API}/students/${selectedId}/history`).then((r) => setSelectedStudentDetail(r.data))
     } catch { toast('❌ Failed to log score', 'error') }
     setSubmitting(false)
   }
@@ -87,6 +113,8 @@ export default function LogEntry() {
         paid_date: feeStatus === 'paid' ? new Date().toISOString() : null,
       })
       toast(`✅ Fee status updated: ${feeStatus} for ${feeMonth}`, 'success')
+      // Refresh student history
+      axios.get(`${API}/students/${selectedId}/history`).then((r) => setSelectedStudentDetail(r.data))
     } catch { toast('❌ Failed to update fee', 'error') }
     setSubmitting(false)
   }
@@ -188,6 +216,22 @@ export default function LogEntry() {
                   onChange={(e) => setAttNotes(e.target.value)}
                 />
               </div>
+
+              {/* Instant Risk Alert Preview Banner for Attendance */}
+              {!attPresent && selectedStudentDetail && (
+                <div className="alert-box high pulse-high" style={{ marginTop: 16, marginBottom: 16 }}>
+                  <div className="alert-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span>⚠️ Instant Risk Alert Preview</span>
+                    <span className="azadi-tag" style={{ background: 'var(--risk-high)', color: '#ffffff', fontSize: 10 }}>HIGH RISK WARNING</span>
+                  </div>
+                  <div className="alert-body" style={{ marginTop: 6, fontSize: 13, lineHeight: 1.5 }}>
+                    Warning: Marking absent will increase <strong>{selectedStudentDetail.student.name}</strong>'s consecutive absences to <strong>{getConsecutiveAbsences(selectedStudentDetail.attendance) + 1}</strong> (
+                    {(getConsecutiveAbsences(selectedStudentDetail.attendance) + 1) >= 5 ? 'Stage 4 Critical Risk Trigger' : (getConsecutiveAbsences(selectedStudentDetail.attendance) + 1) >= 3 ? 'Stage 3 Risk Trigger' : 'Stage 2 Risk Trigger'}
+                    )!
+                  </div>
+                </div>
+              )}
+
               <button className="btn btn-primary" onClick={submitAttendance} disabled={submitting || !selectedId}>
                 {submitting ? '⏳ Saving...' : '✅ Log Attendance'}
               </button>
@@ -241,6 +285,20 @@ export default function LogEntry() {
                 <label className="form-label">Date</label>
                 <input type="date" className="form-input" value={scoreDate} onChange={(e) => setScoreDate(e.target.value)} />
               </div>
+
+              {/* Instant Risk Alert Preview Banner for Test Score */}
+              {scoreValue && scoreMax && (parseFloat(scoreValue)/parseFloat(scoreMax)*100 < 40) && selectedStudentDetail && (
+                <div className="alert-box high pulse-high" style={{ marginTop: 16, marginBottom: 16 }}>
+                  <div className="alert-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span>⚠️ Instant Risk Alert Preview</span>
+                    <span className="azadi-tag" style={{ background: 'var(--risk-high)', color: '#ffffff', fontSize: 10 }}>ACADEMIC WARNING</span>
+                  </div>
+                  <div className="alert-body" style={{ marginTop: 6, fontSize: 13, lineHeight: 1.5 }}>
+                    Warning: Entering a score of <strong>{(parseFloat(scoreValue)/parseFloat(scoreMax)*100).toFixed(1)}%</strong> (&lt; 40%) will trigger a Stage 3 Academic Risk Alert for <strong>{selectedStudentDetail.student.name}</strong>!
+                  </div>
+                </div>
+              )}
+
               <button className="btn btn-primary" onClick={submitScore} disabled={submitting || !selectedId || !scoreValue}>
                 {submitting ? '⏳ Saving...' : '✅ Log Score'}
               </button>
@@ -279,6 +337,20 @@ export default function LogEntry() {
                   ))}
                 </div>
               </div>
+
+              {/* Instant Risk Alert Preview Banner for Fee */}
+              {feeStatus === 'overdue' && selectedStudentDetail && (
+                <div className="alert-box medium" style={{ marginTop: 16, marginBottom: 16 }}>
+                  <div className="alert-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span>⚠️ Instant Risk Alert Preview</span>
+                    <span className="azadi-tag" style={{ background: 'var(--gold)', color: '#05140d', fontSize: 10 }}>FINANCIAL ALERT</span>
+                  </div>
+                  <div className="alert-body" style={{ marginTop: 6, fontSize: 13, lineHeight: 1.5 }}>
+                    Warning: Marking fee status as overdue for <strong>{selectedStudentDetail.student.name}</strong> will elevate financial risk metrics for {feeMonth} {feeYear}!
+                  </div>
+                </div>
+              )}
+
               <button className="btn btn-primary" onClick={submitFee} disabled={submitting || !selectedId}>
                 {submitting ? '⏳ Saving...' : '✅ Update Fee Status'}
               </button>

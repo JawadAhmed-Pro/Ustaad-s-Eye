@@ -100,9 +100,16 @@ class InterventionOut(BaseModel):
     meeting_agenda: str
     actioned: bool
     actioned_at: Optional[datetime]
+    dropout_stage: Optional[int] = 1
+    urdu_voice_script: Optional[str] = None
+    retention_status: Optional[str] = "AT_RISK"
 
     class Config:
         from_attributes = True
+
+
+class RetentionUpdate(BaseModel):
+    retention_status: str
 
 
 # ── Dashboard ─────────────────────────────────────────────────────────────────
@@ -116,6 +123,25 @@ class StudentRiskSummary(BaseModel):
     avg_score: float
     fee_status: str
     last_analysis: Optional[datetime]
+    consecutive_absences: Optional[int] = 0
+    dropout_stage: Optional[int] = 0
+    retention_status: Optional[str] = "AT_RISK"
+
+
+class DropoutStagesBreakdown(BaseModel):
+    stage1_count: int
+    stage2_count: int
+    stage3_count: int
+    stage4_count: int
+
+
+class ConsecutiveAbsenceAlert(BaseModel):
+    student_id: int
+    name: str
+    grade: str
+    consecutive_absences: int
+    dropout_stage: int
+    guardian_phone: Optional[str] = None
 
 
 class DashboardOut(BaseModel):
@@ -123,7 +149,11 @@ class DashboardOut(BaseModel):
     high_risk: int
     medium_risk: int
     low_risk: int
+    dropout_stages: DropoutStagesBreakdown
+    consecutive_absence_alerts: List[ConsecutiveAbsenceAlert]
+    saved_students_count: int
     students: List[StudentRiskSummary]
+
 
 
 # ── History (for charts) ──────────────────────────────────────────────────────
