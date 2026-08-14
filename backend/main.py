@@ -853,6 +853,12 @@ if os.path.exists(FRONTEND_BUILD):
         if full_path:
             file_path = os.path.join(FRONTEND_BUILD, full_path)
             if os.path.exists(file_path) and os.path.isfile(file_path):
+                # Long cache for hashed static assets
+                if full_path.startswith("assets/"):
+                    return FileResponse(file_path, headers={"Cache-Control": "public, max-age=31536000, immutable"})
                 return FileResponse(file_path)
-        return FileResponse(os.path.join(FRONTEND_BUILD, "index.html"))
+        return FileResponse(
+            os.path.join(FRONTEND_BUILD, "index.html"),
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate, max-age=0"}
+        )
 

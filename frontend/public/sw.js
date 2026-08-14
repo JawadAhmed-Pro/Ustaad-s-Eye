@@ -1,35 +1,25 @@
-const CACHE_NAME = 'ustaad-eye-v2';
-const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/favicon.svg',
-  '/icons.svg'
-];
+const CACHE_NAME = 'ustaad-eye-v3';
 
+// Force new service worker to activate immediately
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
-  );
   self.skipWaiting();
 });
 
+// Clean up old caches on activation
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
+      Promise.all(keys.map((k) => caches.delete(k)))
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
-  // Handle API Requests: Network first with Cache fallback & JSON offline fallback
+  // 1. API Requests: Network first with Cache fallback
   if (event.request.url.includes('/api/')) {
     event.respondWith(
       fetch(event.request)
         .then((response) => {
-          // Cache successful GET API responses for offline access
           if (response.ok && event.request.method === 'GET') {
             const clone = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
@@ -38,41 +28,42 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(async () => {
           const cachedResponse = await caches.match(event.request);
-          if (cachedResponse) {
-            return cachedResponse;
-          }
-          return new Response(
+          return cachedResponse || new Response(
             JSON.stringify({ error: 'Offline mode active', offline: true }),
-            {
-              status: 503,
-              headers: { 'Content-Type': 'application/json' },
-            }
+            { status: 503, headers: { 'Content-Type': 'application/json' } }
           );
         })
     );
     return;
   }
 
-  // Handle Static Assets & Page Navigation: Cache first with Network fallback
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) {
-        return cached;
-      }
-      return fetch(event.request)
+  // 2. HTML / Navigation Requests: ALWAYS Network-First so index.html gets latest CSS/JS bundle hashes
+  if (event.request.mode === 'navigate' || event.request.url.endsWith('/') || event.request.url.includes('index.html')) {
+    event.respondWith(
+      fetch(event.request)
         .then((response) => {
-          if (response.status === 200 && event.request.method === 'GET') {
+          if (response.ok) {
             const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+            caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', clone));
           }
           return response;
         })
-        .catch(() => {
-          // SPA navigation fallback to /index.html when offline
-          if (event.request.mode === 'navigate') {
-            return caches.match('/index.html');
-          }
-        });
+        .catch(() => caches.match('/index.html'))
+    );
+    return;
+  }
+
+  // 3. Static Assets (CSS, JS, Fonts, SVGs): Cache first with Network fallback
+  event.respondWith(
+    caches.match(event.request).then((cached) => {
+      if (cached) return cached;
+      return fetch(event.request).then((response) => {
+        if (response.ok && event.request.method === 'GET') {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
+        return response;
+      });
     })
   );
 });
