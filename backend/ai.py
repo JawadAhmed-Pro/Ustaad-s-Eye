@@ -9,12 +9,29 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 if GEMINI_API_KEY and GEMINI_API_KEY != "your_gemini_api_key_here":
     genai.configure(api_key=GEMINI_API_KEY)
-    # Default model can be configured via GEMINI_MODEL environment variable
-    MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
-    try:
-        model = genai.GenerativeModel(MODEL_NAME)
-    except Exception:
+    
+    # Prioritize requested Gemini Flash models (3.5 Flash / 2.5 Flash / 2.0 Flash / 1.5 Flash)
+    target_models = [
+        os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
+        "gemini-3.5-flash",
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-1.5-flash",
+    ]
+    
+    model = None
+    for m in target_models:
+        try:
+            model = genai.GenerativeModel(m)
+            MODEL_NAME = m
+            break
+        except Exception:
+            continue
+            
+    if not model:
         model = genai.GenerativeModel("gemini-1.5-flash")
+        MODEL_NAME = "gemini-1.5-flash"
+        
     AI_ENABLED = True
 else:
     AI_ENABLED = False
