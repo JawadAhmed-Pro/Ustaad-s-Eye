@@ -417,21 +417,6 @@ def get_fees(student_id: int, db: Session = Depends(get_db)):
 # ─────────────────────────────────────────────────────────────────────────────
 # AI Analysis & Interventions
 # ─────────────────────────────────────────────────────────────────────────────
-@api.post("/ai/chat")
-async def ai_chat_endpoint(req: ChatRequest, db: Session = Depends(get_db)):
-    result = await chat_with_ustaad(req.prompt)
-    return result
-
-
-@api.post("/ai/simulate")
-async def simulate_risk_endpoint(req: SimulationRequest):
-    return await simulate_risk_ai(
-        attendance_rate=req.attendance_rate,
-        avg_score=req.avg_score,
-        fee_overdue_months=req.fee_overdue_months,
-    )
-
-
 
 @api.get("/students/{student_id}/analysis")
 async def analyze_student(student_id: int, db: Session = Depends(get_db)):
