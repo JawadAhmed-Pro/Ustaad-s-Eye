@@ -19,9 +19,11 @@ from models import (
     FeeCreate, FeeOut,
     InterventionOut,
     StudentRiskSummary, DashboardOut,
-    StudentHistory
+    StudentHistory,
+    ChatRequest, SimulationRequest
 )
-from ai import analyze_student_risk, draft_intervention
+from ai import analyze_student_risk, draft_intervention, chat_with_ustaad_ai, simulate_risk_ai
+
 
 app = FastAPI(title="Ustaad's Eye API", version="1.0.0")
 
@@ -199,6 +201,22 @@ def get_fees(student_id: int, db: Session = Depends(get_db)):
 # ─────────────────────────────────────────────────────────────────────────────
 # AI Analysis & Interventions
 # ─────────────────────────────────────────────────────────────────────────────
+@api.post("/ai/chat")
+async def ai_chat_endpoint(req: ChatRequest, db: Session = Depends(get_db)):
+    result = await chat_with_ustaad(req.prompt)
+    return result
+
+
+@api.post("/ai/simulate")
+async def simulate_risk_endpoint(req: SimulationRequest):
+    return await simulate_risk_ai(
+        attendance_rate=req.attendance_rate,
+        avg_score=req.avg_score,
+        fee_overdue_months=req.fee_overdue_months,
+    )
+
+
+
 @api.get("/students/{student_id}/analysis")
 async def analyze_student(student_id: int, db: Session = Depends(get_db)):
     student = db.query(Student).filter(Student.id == student_id).first()
@@ -257,6 +275,42 @@ def action_intervention(intervention_id: int, db: Session = Depends(get_db)):
 @api.get("/interventions", response_model=List[InterventionOut])
 def list_interventions(db: Session = Depends(get_db)):
     return db.query(Intervention).order_by(Intervention.created_at.desc()).all()
+
+
+@api.post("/ai/chat")
+async def chat_ai(req: ChatRequest, db: Session = Depends(get_db)):
+    context = req.context_students
+    if context is None:
+        try:
+            students = db.query(Student).all()
+            context = []
+            for s in students[:8]:
+                m = compute_student_metrics(s)
+                r = get_latest_risk(s)
+                context.append({
+                    "name": s.name,
+                    "grade": s.grade,
+                    "risk_level": r.get("risk_level", "UNKNOWN"),
+                    "risk_score": r.get("risk_score", 0),
+                    "attendance_rate": m.get("attendance_rate", 0),
+                    "avg_score": m.get("avg_score", 0),
+                    "fee_status": m.get("latest_fee_status", "paid")
+                })
+        except Exception:
+            context = []
+
+    res = await chat_with_ustaad_ai(prompt=req.prompt, context_students=context)
+    return res
+
+
+@api.post("/ai/simulate")
+async def simulate_ai(req: SimulationRequest):
+    res = await simulate_risk_ai(
+        attendance_rate=req.attendance_rate,
+        avg_score=req.avg_score,
+        fee_overdue_months=req.fee_overdue_months
+    )
+    return res
 
 
 # ─────────────────────────────────────────────────────────────────────────────

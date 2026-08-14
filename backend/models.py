@@ -133,3 +133,16 @@ class StudentHistory(BaseModel):
     scores: List[ScoreOut]
     fees: List[FeeOut]
     latest_intervention: Optional[InterventionOut]
+
+
+# ── AI Requests ───────────────────────────────────────────────────────────────
+class ChatRequest(BaseModel):
+    prompt: str
+    context_students: Optional[List[dict]] = None
+
+
+class SimulationRequest(BaseModel):
+    attendance_rate: float
+    avg_score: float
+    fee_overdue_months: int
+

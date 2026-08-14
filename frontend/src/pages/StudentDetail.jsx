@@ -37,6 +37,13 @@ const chartDefaults = {
   },
 }
 
+function getRiskColor(level) {
+  if (level === 'HIGH') return 'var(--risk-high)'
+  if (level === 'MEDIUM') return 'var(--gold)'
+  if (level === 'LOW') return 'var(--accent-light)'
+  return 'var(--text-muted)'
+}
+
 function AttendanceChart({ data }) {
   // Weekly attendance rate
   const byWeek = []
@@ -130,12 +137,62 @@ export default function StudentDetail() {
   const [loading, setLoading] = useState(true)
   const [analyzing, setAnalyzing] = useState(false)
 
+  // Simulation Sliders State
+  const [simAttendance, setSimAttendance] = useState(100)
+  const [simScore, setSimScore] = useState(100)
+  const [simFeeOverdue, setSimFeeOverdue] = useState(0)
+  const [simResult, setSimResult] = useState(null)
+  const [simLoading, setSimLoading] = useState(false)
+
   const load = () => {
     setLoading(true)
-    axios.get(`${API}/students/${id}/history`).then((r) => { setData(r.data); setLoading(false) })
+    axios.get(`${API}/students/${id}/history`).then((r) => { 
+      setData(r.data)
+      setLoading(false)
+    })
   }
 
   useEffect(() => { load() }, [id])
+
+  useEffect(() => {
+    if (data?.metrics) {
+      const att = data.metrics.attendance_rate ?? 100
+      const sc = data.metrics.avg_score ?? 100
+      const fee = data.metrics.fee_overdue_months ?? 0
+      setSimAttendance(att)
+      setSimScore(sc)
+      setSimFeeOverdue(fee)
+      runLiveSimulation(att, sc, fee)
+    }
+  }, [data])
+
+  const runLiveSimulation = async (att, score, fee) => {
+    setSimLoading(true)
+    try {
+      const res = await axios.post(`${API}/ai/simulate`, {
+        attendance_rate: Number(att),
+        avg_score: Number(score),
+        fee_overdue_months: Number(fee),
+      })
+      setSimResult(res.data)
+    } catch (e) {
+      console.error("Simulation error:", e)
+    } finally {
+      setSimLoading(false)
+    }
+  }
+
+  const resetSliders = () => {
+    if (data?.metrics) {
+      const att = data.metrics.attendance_rate ?? 100
+      const sc = data.metrics.avg_score ?? 100
+      const fee = data.metrics.fee_overdue_months ?? 0
+      setSimAttendance(att)
+      setSimScore(sc)
+      setSimFeeOverdue(fee)
+      runLiveSimulation(att, sc, fee)
+    }
+  }
 
   const runAnalysis = async () => {
     setAnalyzing(true)
@@ -217,6 +274,145 @@ export default function StudentDetail() {
         </div>
       </div>
 
+      {/* ⚡ Interactive Gemini AI Risk Simulator Card */}
+      <div className="card" style={{ marginBottom: 24, border: '1px solid var(--gold)', background: 'linear-gradient(135deg, rgba(16, 45, 32, 0.95), rgba(10, 32, 22, 0.85))' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 24 }}>⚡</span>
+            <div>
+              <h3 style={{ fontSize: 18, fontWeight: 800, color: '#ffffff' }}>Interactive Gemini AI Risk Simulator</h3>
+              <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                Drag sliders to dynamically simulate dropout risk level, risk score, and instant AI explanation
+              </p>
+            </div>
+          </div>
+          <span className="azadi-tag" style={{ background: 'var(--gold)', color: '#05140d' }}>
+            LIVE AI SIMULATOR
+          </span>
+        </div>
+
+        {/* Sliders Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 20, marginBottom: 20 }}>
+          {/* Attendance Slider */}
+          <div className="sim-slider-group">
+            <div className="sim-slider-header">
+              <span>📅 Attendance Rate</span>
+              <span className="sim-slider-value" style={{ color: simAttendance < 65 ? 'var(--risk-high)' : simAttendance < 80 ? 'var(--gold)' : 'var(--accent-light)' }}>
+                {simAttendance}%
+              </span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              value={simAttendance}
+              className="sim-slider"
+              onChange={(e) => {
+                const v = Number(e.target.value)
+                setSimAttendance(v)
+                runLiveSimulation(v, simScore, simFeeOverdue)
+              }}
+            />
+          </div>
+
+          {/* Test Score Slider */}
+          <div className="sim-slider-group">
+            <div className="sim-slider-header">
+              <span>📝 Test Score (Avg)</span>
+              <span className="sim-slider-value" style={{ color: simScore < 40 ? 'var(--risk-high)' : simScore < 60 ? 'var(--gold)' : 'var(--accent-light)' }}>
+                {simScore}%
+              </span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              value={simScore}
+              className="sim-slider"
+              onChange={(e) => {
+                const v = Number(e.target.value)
+                setSimScore(v)
+                runLiveSimulation(simAttendance, v, simFeeOverdue)
+              }}
+            />
+          </div>
+
+          {/* Fee Overdue Months Slider */}
+          <div className="sim-slider-group">
+            <div className="sim-slider-header">
+              <span>💰 Fee Overdue Months</span>
+              <span className="sim-slider-value" style={{ color: simFeeOverdue >= 3 ? 'var(--risk-high)' : simFeeOverdue >= 1 ? 'var(--gold)' : 'var(--accent-light)' }}>
+                {simFeeOverdue} Month{simFeeOverdue !== 1 ? 's' : ''}
+              </span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="6"
+              step="1"
+              value={simFeeOverdue}
+              className="sim-slider"
+              onChange={(e) => {
+                const v = Number(e.target.value)
+                setSimFeeOverdue(v)
+                runLiveSimulation(simAttendance, simScore, v)
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Simulated Results Box */}
+        {simResult && (
+          <div style={{
+            background: 'rgba(5, 20, 13, 0.75)',
+            border: `1px solid ${getRiskColor(simResult.risk_level)}`,
+            borderRadius: 'var(--radius)',
+            padding: 18,
+            position: 'relative'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span className={`risk-badge ${simResult.risk_level}`} style={{ fontSize: 13 }}>
+                  {simResult.risk_level === 'HIGH' ? '🔴' : simResult.risk_level === 'MEDIUM' ? '🌙' : '⭐'} SIMULATED {simResult.risk_level} RISK
+                </span>
+                {simLoading && <span style={{ fontSize: 12, color: 'var(--gold-light)' }}>⚡ Computing AI Simulation...</span>}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Simulated Risk Score:</span>
+                <span style={{ fontSize: 20, fontWeight: 800, color: getRiskColor(simResult.risk_level) }}>
+                  {simResult.risk_score}/100
+                </span>
+              </div>
+            </div>
+
+            {/* Risk Score Track */}
+            <div className="risk-bar-track" style={{ marginBottom: 14, height: 10 }}>
+              <div
+                className="risk-bar-fill"
+                style={{
+                  width: `${simResult.risk_score}%`,
+                  background: getRiskColor(simResult.risk_level),
+                }}
+              />
+            </div>
+
+            {/* AI Explanation Text */}
+            <div style={{ fontSize: 14, color: 'var(--text-primary)', lineHeight: 1.6, marginBottom: 14 }}>
+              🤖 <strong>Instant AI Explanation:</strong> {simResult.risk_explanation}
+            </div>
+
+            {/* Reset button */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button className="btn btn-ghost btn-sm" onClick={resetSliders}>
+                🔄 Reset Sliders to Actual Student Metrics
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* AI Risk Explanation */}
       {latest_intervention && (
         <div className={`alert-box ${latest_intervention.risk_level.toLowerCase()}`} style={{ marginBottom: 24 }}>
@@ -290,4 +486,3 @@ export default function StudentDetail() {
     </div>
   )
 }
-

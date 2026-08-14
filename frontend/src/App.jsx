@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard'
 import StudentDetail from './pages/StudentDetail'
 import LogEntry from './pages/LogEntry'
 import Interventions from './pages/Interventions'
+import UstaadAIChat from './components/UstaadAIChat'
 
 const ToastContext = React.createContext(null)
 
@@ -156,6 +157,7 @@ export default function App() {
             </Routes>
           </main>
           <ToastContainer toasts={toasts} />
+          <UstaadAIChat />
         </div>
       </BrowserRouter>
     </ToastContext.Provider>
