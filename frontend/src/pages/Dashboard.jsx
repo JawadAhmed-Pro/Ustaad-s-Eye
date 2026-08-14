@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { API } from '../api'
+import { useToast } from '../App'
 
 function getRiskColor(level) {
   if (level === 'HIGH') return 'var(--risk-high)'
@@ -32,7 +33,9 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [filter, setFilter] = useState('ALL')
-  
+  const [seeding, setSeeding] = useState(false)
+  const toast = useToast()
+
   // Modals for AI Demo Features
   const [showSimModal, setShowSimModal] = useState(false)
   const [showReportModal, setShowReportModal] = useState(false)
@@ -44,7 +47,8 @@ export default function Dashboard() {
 
   const navigate = useNavigate()
 
-  useEffect(() => {
+  const fetchDashboardData = (showSpinner = true) => {
+    if (showSpinner) setLoading(true)
     axios.get(`${API}/dashboard`)
       .then((r) => {
         if (r.data && Array.isArray(r.data.students)) {
@@ -57,7 +61,25 @@ export default function Dashboard() {
         setError("Could not connect to server. Please check backend connection.")
         setLoading(false)
       })
+  }
+
+  useEffect(() => {
+    fetchDashboardData(true)
   }, [])
+
+  const handleBulkSeed = async () => {
+    setSeeding(true)
+    try {
+      await axios.post(`${API}/students/bulk-seed`)
+      toast('⚡ 35 Students & AI Interventions Seeded Live!', 'success')
+      fetchDashboardData(false)
+    } catch (err) {
+      console.error("Failed to seed students:", err)
+      toast('❌ Failed to seed demo students. Please check server.', 'error')
+    } finally {
+      setSeeding(false)
+    }
+  }
 
   if (loading) return (
     <div>
@@ -82,9 +104,19 @@ export default function Dashboard() {
     <div>
       {/* Page Header */}
       <div className="page-header">
-        <div className="page-title-row">
-          <h1 className="page-title">🇵🇰 Class Overview | Jashn-e-Azadi Special</h1>
-          <span className="azadi-tag">AZADI 2026</span>
+        <div className="page-title-row" style={{ justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <h1 className="page-title">🇵🇰 Class Overview | Jashn-e-Azadi Special</h1>
+            <span className="azadi-tag">AZADI 2026</span>
+          </div>
+          <button
+            className="btn btn-gold"
+            onClick={handleBulkSeed}
+            disabled={seeding}
+            style={{ fontSize: 14, fontWeight: 800, padding: '10px 18px', boxShadow: '0 4px 16px rgba(245, 158, 11, 0.4)' }}
+          >
+            {seeding ? '⚡ Seeding 35+ Students...' : '🎲 Seed 35+ Real-Time Demo Students'}
+          </button>
         </div>
         <div className="page-title-urdu">نگرانی طالبات — گورنمنٹ گرلز اسکول بہاولپور</div>
         <div className="page-subtitle">
@@ -127,6 +159,9 @@ export default function Dashboard() {
           </button>
           <button className="btn btn-primary" onClick={() => setShowReportModal(true)}>
             📜 Generate Jashn-e-Azadi Report
+          </button>
+          <button className="btn btn-success" onClick={handleBulkSeed} disabled={seeding}>
+            {seeding ? '⚡ Seeding...' : '🎲 Seed 35+ Real-Time Demo Students'}
           </button>
         </div>
       </div>

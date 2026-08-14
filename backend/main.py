@@ -132,6 +132,222 @@ def delete_student(student_id: int, db: Session = Depends(get_db)):
     return {"message": "Student deleted"}
 
 
+@api.post("/students/bulk-seed")
+async def bulk_seed_students(db: Session = Depends(get_db)):
+    """
+    Bulk seed 35 realistic Pakistani student profiles with attendance, scores, fees,
+    and AI risk analysis with personalized bilingual (Urdu/English) parent messages.
+    """
+    from ai import compute_local_risk
+
+    seed_profiles = [
+        {"name": "Fatima Noor", "grade": "8", "guardian_name": "Tariq Noor", "guardian_phone": "0300-1112233", "att_rate": 45.0, "avg_score": 32.0, "fee_pattern": ["paid", "overdue", "overdue", "overdue"]},
+        {"name": "Zainab Bibi", "grade": "7", "guardian_name": "Ghulam Murtaza", "guardian_phone": "0312-2223344", "att_rate": 95.0, "avg_score": 88.0, "fee_pattern": ["paid", "paid", "paid", "paid"]},
+        {"name": "Mariam Akhtar", "grade": "9", "guardian_name": "Akhtar Hussain", "guardian_phone": "0333-3334455", "att_rate": 62.0, "avg_score": 54.0, "fee_pattern": ["paid", "paid", "pending", "pending"]},
+        {"name": "Hira Shah", "grade": "6", "guardian_name": "Syed Ali Shah", "guardian_phone": "0345-4445566", "att_rate": 92.0, "avg_score": 85.0, "fee_pattern": ["paid", "paid", "paid", "paid"]},
+        {"name": "Bakhtawar Ali", "grade": "10", "guardian_name": "Liaquat Ali", "guardian_phone": "0321-5556677", "att_rate": 48.0, "avg_score": 35.0, "fee_pattern": ["paid", "paid", "overdue", "overdue"]},
+        {"name": "Aisha Tariq", "grade": "8", "guardian_name": "Tariq Mehmood", "guardian_phone": "0301-6667788", "att_rate": 78.0, "avg_score": 72.0, "fee_pattern": ["paid", "paid", "paid", "pending"]},
+        {"name": "Rimsha Parveen", "grade": "7", "guardian_name": "Parvez Ahmad", "guardian_phone": "0315-7778899", "att_rate": 52.0, "avg_score": 42.0, "fee_pattern": ["paid", "overdue", "overdue", "overdue"]},
+        {"name": "Sana Malik", "grade": "6", "guardian_name": "Malik Farooq", "guardian_phone": "0334-8889900", "att_rate": 88.0, "avg_score": 79.0, "fee_pattern": ["paid", "paid", "paid", "paid"]},
+        {"name": "Tayyaba Gul", "grade": "9", "guardian_name": "Gul Muhammad", "guardian_phone": "0302-9990011", "att_rate": 65.0, "avg_score": 58.0, "fee_pattern": ["paid", "paid", "pending", "pending"]},
+        {"name": "Sumaira Parveen", "grade": "10", "guardian_name": "Muhammad Aslam", "guardian_phone": "0313-1011122", "att_rate": 46.0, "avg_score": 28.0, "fee_pattern": ["paid", "overdue", "overdue", "overdue"]},
+        {"name": "Bushra Bibi", "grade": "8", "guardian_name": "Muhammad Ramzan", "guardian_phone": "0322-2122233", "att_rate": 96.0, "avg_score": 91.0, "fee_pattern": ["paid", "paid", "paid", "paid"]},
+        {"name": "Sadia Kiran", "grade": "7", "guardian_name": "Kiran Shahzad", "guardian_phone": "0335-3233344", "att_rate": 58.0, "avg_score": 49.0, "fee_pattern": ["paid", "paid", "pending", "overdue"]},
+        {"name": "Nimra Khan", "grade": "6", "guardian_name": "Imran Khan", "guardian_phone": "0346-4344455", "att_rate": 84.0, "avg_score": 76.0, "fee_pattern": ["paid", "paid", "paid", "paid"]},
+        {"name": "Laiba Tariq", "grade": "9", "guardian_name": "Tariq Jamil", "guardian_phone": "0303-5455566", "att_rate": 70.0, "avg_score": 64.0, "fee_pattern": ["paid", "paid", "paid", "pending"]},
+        {"name": "Aliza Shah", "grade": "10", "guardian_name": "Shahbaz Ahmed", "guardian_phone": "0314-6566677", "att_rate": 98.0, "avg_score": 92.0, "fee_pattern": ["paid", "paid", "paid", "paid"]},
+        {"name": "Mahnoor Abbas", "grade": "8", "guardian_name": "Abbas Raza", "guardian_phone": "0323-7677788", "att_rate": 50.0, "avg_score": 38.0, "fee_pattern": ["paid", "paid", "overdue", "overdue"]},
+        {"name": "Kinza Farooq", "grade": "7", "guardian_name": "Farooq Azam", "guardian_phone": "0336-8788899", "att_rate": 90.0, "avg_score": 82.0, "fee_pattern": ["paid", "paid", "paid", "paid"]},
+        {"name": "Sidra Tul Ain", "grade": "6", "guardian_name": "Ain ul Haq", "guardian_phone": "0347-9899900", "att_rate": 64.0, "avg_score": 55.0, "fee_pattern": ["paid", "paid", "pending", "pending"]},
+        {"name": "Iqra Batool", "grade": "9", "guardian_name": "Batool Hassan", "guardian_phone": "0304-0900011", "att_rate": 92.0, "avg_score": 86.0, "fee_pattern": ["paid", "paid", "paid", "paid"]},
+        {"name": "Rubab Fatima", "grade": "10", "guardian_name": "Fatima Tu Zahra", "guardian_phone": "0316-1011122", "att_rate": 47.0, "avg_score": 31.0, "fee_pattern": ["paid", "overdue", "overdue", "overdue"]},
+        {"name": "Sobia Parveen", "grade": "8", "guardian_name": "Parvez Iqbal", "guardian_phone": "0324-2122233", "att_rate": 75.0, "avg_score": 68.0, "fee_pattern": ["paid", "paid", "paid", "pending"]},
+        {"name": "Farah Naz", "grade": "7", "guardian_name": "Nazir Ahmed", "guardian_phone": "0337-3233344", "att_rate": 55.0, "avg_score": 44.0, "fee_pattern": ["paid", "paid", "overdue", "overdue"]},
+        {"name": "Uzma Bibi", "grade": "6", "guardian_name": "Bibi Gul", "guardian_phone": "0348-4344455", "att_rate": 94.0, "avg_score": 89.0, "fee_pattern": ["paid", "paid", "paid", "paid"]},
+        {"name": "Humaira Yasmeen", "grade": "9", "guardian_name": "Yasmeen Arshad", "guardian_phone": "0305-5455566", "att_rate": 68.0, "avg_score": 61.0, "fee_pattern": ["paid", "paid", "pending", "pending"]},
+        {"name": "Khadija Tul Kubra", "grade": "10", "guardian_name": "Kubra Shafi", "guardian_phone": "0317-6566677", "att_rate": 89.0, "avg_score": 83.0, "fee_pattern": ["paid", "paid", "paid", "paid"]},
+        {"name": "Komal Akhtar", "grade": "8", "guardian_name": "Akhtar Nawaz", "guardian_phone": "0325-7677788", "att_rate": 51.0, "avg_score": 39.0, "fee_pattern": ["paid", "overdue", "overdue", "overdue"]},
+        {"name": "Nadia Bibi", "grade": "7", "guardian_name": "Habibullah", "guardian_phone": "0338-8788899", "att_rate": 91.0, "avg_score": 84.0, "fee_pattern": ["paid", "paid", "paid", "paid"]},
+        {"name": "Nida Fatima", "grade": "6", "guardian_name": "Muhammad Asif", "guardian_phone": "0349-9899900", "att_rate": 61.0, "avg_score": 52.0, "fee_pattern": ["paid", "paid", "pending", "pending"]},
+        {"name": "Saman Shahzadi", "grade": "9", "guardian_name": "Shahzad Gul", "guardian_phone": "0306-0900011", "att_rate": 97.0, "avg_score": 90.0, "fee_pattern": ["paid", "paid", "paid", "paid"]},
+        {"name": "Syeda Maryam", "grade": "10", "guardian_name": "Syed Kazim", "guardian_phone": "0318-1011122", "att_rate": 49.0, "avg_score": 34.0, "fee_pattern": ["paid", "paid", "overdue", "overdue"]},
+        {"name": "Tanzila Bibi", "grade": "8", "guardian_name": "Tanveer Ahmed", "guardian_phone": "0326-2122233", "att_rate": 76.0, "avg_score": 70.0, "fee_pattern": ["paid", "paid", "paid", "pending"]},
+        {"name": "Zahra Batool", "grade": "7", "guardian_name": "Batool Zahid", "guardian_phone": "0339-3233344", "att_rate": 57.0, "avg_score": 46.0, "fee_pattern": ["paid", "paid", "pending", "overdue"]},
+        {"name": "Tehmina Kausar", "grade": "6", "guardian_name": "Kausar Parveen", "guardian_phone": "0350-4344455", "att_rate": 93.0, "avg_score": 87.0, "fee_pattern": ["paid", "paid", "paid", "paid"]},
+        {"name": "Zunaira Riaz", "grade": "9", "guardian_name": "Riaz Hussain", "guardian_phone": "0307-5455566", "att_rate": 66.0, "avg_score": 57.0, "fee_pattern": ["paid", "paid", "pending", "pending"]},
+        {"name": "Bisma Noor", "grade": "10", "guardian_name": "Noor Muhammad", "guardian_phone": "0319-6566677", "att_rate": 45.0, "avg_score": 30.0, "fee_pattern": ["paid", "overdue", "overdue", "overdue"]}
+    ]
+
+    try:
+        # Determine starting roll number to avoid collisions
+        existing = db.query(Student).all()
+        max_num = 0
+        for s in existing:
+            if s.roll_number and s.roll_number.startswith("GS-"):
+                try:
+                    num = int(s.roll_number.replace("GS-", ""))
+                    if num > max_num:
+                        max_num = num
+                except ValueError:
+                    pass
+        if max_num == 0:
+            max_num = len(existing)
+
+        today = datetime.utcnow()
+        subjects = ["Urdu", "Math", "Science", "English", "Islamiat"]
+        months = ["March", "April", "May", "June"]
+
+        created_count = 0
+
+        for idx, prof in enumerate(seed_profiles):
+            roll = f"GS-{(max_num + idx + 1):03d}"
+            student = Student(
+                name=prof["name"],
+                grade=prof["grade"],
+                roll_number=roll,
+                guardian_name=prof["guardian_name"],
+                guardian_phone=prof["guardian_phone"]
+            )
+            db.add(student)
+            db.flush()
+
+            # 1. Attendance records (20 days)
+            target_present = int(round(20 * (prof["att_rate"] / 100.0)))
+            for day_i in range(20):
+                date = today - timedelta(days=20 - day_i)
+                is_present = day_i < target_present
+                att_record = AttendanceRecord(
+                    student_id=student.id,
+                    date=date,
+                    present=is_present
+                )
+                db.add(att_record)
+
+            # 2. Score records (5 subjects)
+            base_score = prof["avg_score"]
+            score_offsets = [-4.0, 3.0, -2.0, 5.0, -2.0]
+            for s_idx, subj in enumerate(subjects):
+                date = today - timedelta(days=18 - s_idx * 3)
+                score_val = max(10.0, min(100.0, base_score + score_offsets[s_idx]))
+                score_record = ScoreRecord(
+                    student_id=student.id,
+                    date=date,
+                    subject=subj,
+                    score=round(score_val, 1),
+                    max_score=100.0,
+                    test_type="Monthly Test"
+                )
+                db.add(score_record)
+
+            # 3. Fee records (4 months)
+            for m_idx, status in enumerate(prof["fee_pattern"]):
+                fee_record = FeeRecord(
+                    student_id=student.id,
+                    month=months[m_idx],
+                    year=2025,
+                    status=status,
+                    amount=500.0,
+                    paid_date=today - timedelta(days=30 * (3 - m_idx)) if status == "paid" else None
+                )
+                db.add(fee_record)
+
+            db.flush()
+
+            # 4. Metrics & Risk Analysis
+            metrics = compute_student_metrics(student)
+            risk_data = compute_local_risk(
+                metrics["attendance_rate"],
+                metrics["avg_score"],
+                metrics["fee_overdue_months"]
+            )
+
+            risk_level = risk_data["risk_level"]
+            risk_score = risk_data["risk_score"]
+            signals = risk_data["signals"]
+            signals_str = " | ".join(signals) if signals else "No major risk signals detected."
+
+            # Generate personalized Urdu/English parent messages
+            if risk_level == "HIGH":
+                parent_sms = (
+                    f"محترم {prof['guardian_name']}، {prof['name']} (کلاس {prof['grade']}) کی حاضری ({metrics['attendance_rate']:.0f}%) "
+                    f"اور ٹیسٹ رزلٹ ({metrics['avg_score']:.0f}%) پر فوری توجہ درکار ہے۔ برائے کرم اسکول انتظامیہ سے رابطہ کریں۔ "
+                    f"[Dear {prof['guardian_name']}, {prof['name']} (Grade {prof['grade']}) requires urgent attention. Att: {metrics['attendance_rate']:.0f}%, Avg: {metrics['avg_score']:.0f}%. Please contact Ustaad's Eye School.]"
+                )[:160]
+                counselor_alert = (
+                    f"CRITICAL RISK ALERT: {prof['name']} (Grade {prof['grade']}). "
+                    f"Signals: {signals_str}. Attendance rate is {metrics['attendance_rate']:.1f}% and academic average is {metrics['avg_score']:.1f}%. "
+                    f"Guardian {prof['guardian_name']} ({prof['guardian_phone']}) should be contacted immediately."
+                )
+                meeting_agenda = (
+                    f"• 1. Welcome & introduction with {prof['guardian_name']}\n"
+                    f"• 2. Discuss {prof['name']}'s attendance concern ({metrics['attendance_rate']:.0f}%)\n"
+                    f"• 3. Review failing score trends ({metrics['avg_score']:.0f}%)\n"
+                    f"• 4. Address fee status ({metrics['latest_fee_status']})\n"
+                    f"• 5. Establish customized daily tutoring and attendance tracking plan"
+                )
+            elif risk_level == "MEDIUM":
+                parent_sms = (
+                    f"محترم {prof['guardian_name']}، {prof['name']} (کلاس {prof['grade']}) کی کارکردگی میں بہتری کی ضرورت ہے "
+                    f"(حاضری: {metrics['attendance_rate']:.0f}%)۔ برائے کرم اسکول سے رابطہ رکھیں۔ "
+                    f"[Dear {prof['guardian_name']}, {prof['name']} (Grade {prof['grade']}) needs performance support. Att: {metrics['attendance_rate']:.0f}%. Ustaad's Eye School.]"
+                )[:160]
+                counselor_alert = (
+                    f"MEDIUM RISK WARNING: {prof['name']} (Grade {prof['grade']}). "
+                    f"Signals: {signals_str}. Attendance: {metrics['attendance_rate']:.1f}%, Score Avg: {metrics['avg_score']:.1f}%. "
+                    f"Follow up with student and guardian."
+                )
+                meeting_agenda = (
+                    f"• 1. Greeting and positive feedback for {prof['name']}\n"
+                    f"• 2. Review areas needing academic improvement\n"
+                    f"• 3. Discuss regular attendance goals\n"
+                    f"• 4. Agree on bi-weekly progress updates"
+                )
+            else:
+                parent_sms = (
+                    f"محترم {prof['guardian_name']}، {prof['name']} (کلاس {prof['grade']}) کی کارکردگی بہت عمدہ ہے "
+                    f"(حاضری: {metrics['attendance_rate']:.0f}%، نمبرز: {metrics['avg_score']:.0f}%)۔ استاد کی نظر اسکول۔ "
+                    f"[Dear {prof['guardian_name']}, {prof['name']} (Grade {prof['grade']}) is performing excellently! Att: {metrics['attendance_rate']:.0f}%. Ustaad's Eye School.]"
+                )[:160]
+                counselor_alert = (
+                    f"LOW RISK (ON TRACK): {prof['name']} (Grade {prof['grade']}). "
+                    f"Performing well with {metrics['attendance_rate']:.1f}% attendance and {metrics['avg_score']:.1f}% test average."
+                )
+                meeting_agenda = (
+                    f"• 1. Commend {prof['name']} for outstanding dedication\n"
+                    f"• 2. Encourage participation in extracurricular activities\n"
+                    f"• 3. Set goals for upcoming term exams"
+                )
+
+            risk_explanation = (
+                f"{prof['name']} (Grade {prof['grade']}) is assessed as {risk_level} risk (score: {risk_score}/100). "
+                f"Attendance: {metrics['attendance_rate']:.1f}%, Test Avg: {metrics['avg_score']:.1f}%. {signals_str}"
+            )
+
+            intervention = Intervention(
+                student_id=student.id,
+                risk_level=risk_level,
+                risk_score=risk_score,
+                risk_explanation=risk_explanation,
+                parent_sms=parent_sms,
+                counselor_alert=counselor_alert,
+                meeting_agenda=meeting_agenda
+            )
+            db.add(intervention)
+            created_count += 1
+
+        db.commit()
+
+        return {
+            "status": "success",
+            "count": created_count,
+            "message": f"Successfully seeded {created_count} realistic student records with AI risk analysis!"
+        }
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to bulk seed students: {str(e)}")
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Attendance
 # ─────────────────────────────────────────────────────────────────────────────

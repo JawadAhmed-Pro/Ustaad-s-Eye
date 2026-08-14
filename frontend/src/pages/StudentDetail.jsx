@@ -9,6 +9,7 @@ import {
 import { Line, Bar } from 'react-chartjs-2'
 import { useToast } from '../App'
 import { API } from '../api'
+import { cleanPhoneNumber } from '../utils/phone'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler)
 
@@ -456,7 +457,19 @@ export default function StudentDetail() {
           </div>
 
           <div className="intervention-tab">
-            <div className="intervention-tab-title">📱 Parent SMS Draft</div>
+            <div className="intervention-tab-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+              <span>📱 Parent SMS Draft</span>
+              <button
+                className="btn btn-sm btn-success"
+                onClick={() => {
+                  const cleanPhone = cleanPhoneNumber(student.guardian_phone)
+                  const url = 'https://api.whatsapp.com/send?phone=' + cleanPhone + '&text=' + encodeURIComponent(latest_intervention.parent_sms || '')
+                  window.open(url, '_blank')
+                }}
+              >
+                📲 Send WhatsApp to Guardian
+              </button>
+            </div>
             <div className="intervention-text" style={{ background: 'var(--bg-primary)', padding: 12, borderRadius: 8, fontFamily: 'monospace', fontSize: 13 }}>
               {latest_intervention.parent_sms}
             </div>

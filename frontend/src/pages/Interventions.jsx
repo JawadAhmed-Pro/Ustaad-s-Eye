@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { useToast } from '../App'
 import { API } from '../api'
+import { cleanPhoneNumber } from '../utils/phone'
 
 function InterventionCard({ item, onAction, onViewStudent }) {
   const [expanded, setExpanded] = useState(false)
@@ -79,7 +80,20 @@ function InterventionCard({ item, onAction, onViewStudent }) {
         <div style={{ marginTop: 18, borderTop: '1px solid var(--border)', paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
           {item.parent_sms && (
             <div className="intervention-tab">
-              <div className="intervention-tab-title">📱 Parent SMS</div>
+              <div className="intervention-tab-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                <span>📱 Parent SMS</span>
+                <button
+                  className="btn btn-sm btn-success"
+                  onClick={() => {
+                    const phone = item.guardian_phone || ''
+                    const cleanPhone = cleanPhoneNumber(phone)
+                    const url = 'https://api.whatsapp.com/send?phone=' + cleanPhone + '&text=' + encodeURIComponent(item.parent_sms || '')
+                    window.open(url, '_blank')
+                  }}
+                >
+                  📲 Send WhatsApp to Guardian
+                </button>
+              </div>
               <div className="intervention-text" style={{ fontFamily: 'monospace', fontSize: 13, background: 'var(--bg-primary)', padding: 12, borderRadius: 8 }}>
                 {item.parent_sms}
               </div>
@@ -124,6 +138,7 @@ export default function Interventions() {
         ...i,
         student_name: stuMap[i.student_id]?.name || 'Unknown',
         student_grade: stuMap[i.student_id]?.grade || '?',
+        guardian_phone: stuMap[i.student_id]?.guardian_phone || '0312-1234567',
       }))
       setInterventions(enriched)
       setLoading(false)
